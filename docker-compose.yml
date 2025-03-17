@@ -1,0 +1,40 @@
+services:
+  auth_service:
+    build:
+      context: ./auth_service
+      args:
+        - BUILD_DNS=8.8.8.8  # Optional: DNS for build phase
+    container_name: auth_service
+    restart: always
+    depends_on:
+      confero_db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./auth_service:/app
+    command: python manage.py runserver 0.0.0.0:8000
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+
+  confero_db:
+    image: postgres:15
+    container_name: confero_db
+    restart: always
+    environment:
+      POSTGRES_DB: confero_db
+      POSTGRES_USER: confero_user
+      POSTGRES_PASSWORD: confero_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U confero_user -d confero_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
