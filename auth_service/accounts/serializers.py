@@ -13,22 +13,14 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ['id', 'username', 'email', 'phone_number', 'age', 'password']
-        
+        fields = [ 'username', 'email', 'password']
+        extra_kwargs = {'password': {'write_only': True}}
+
     def create(self, validated_data):
-        user = CustomUser.objects.create_user(**validated_data)
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
-        token = email_verification_token.make_token(user)
-        verification_link = self.context['request'].build_absolute_uri(
-            reverse('verify-email') + f'?uid={uid}&token={token}'
-        )
-        # Send email
-        send_mail(
-            subject='Verify Your Email',
-            message=f'Click this link to verify your email: {verification_link}',
-            from_email='your-email@gmail.com',
-            recipient_list=[user.email],
-            fail_silently=False,
+        user = CustomUser.objects.create_user(
+            username=validated_data['username'],
+            email=validated_data['email'],
+            password=validated_data['password']
         )
         return user
 
@@ -47,7 +39,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email', read_only=True)
     class Meta:
         model = Profile
-        fields = ['username','email','Phone_number', 'bio', 'Profile_photo']
+        fields = ['username','email','phone_number', 'bio', 'profile_photo']
         
         def update(self, instance, validated_data):
         # Update user-related fields (username)

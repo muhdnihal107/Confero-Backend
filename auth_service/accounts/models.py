@@ -1,6 +1,6 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
-
+import uuid
 class CustomUserManager(BaseUserManager):
     """Manager for CustomUser model"""
     def create_user(self, email, password=None, **extra_fields):
@@ -20,14 +20,13 @@ class CustomUserManager(BaseUserManager):
 class CustomUser(AbstractUser):
     username = models.CharField(max_length=150, unique=True)
     email = models.EmailField(unique=True)
-    phone_number = models.CharField(max_length=15, unique=True)
-    age = models.PositiveIntegerField(null=True, blank=True)
     is_verified = models.BooleanField(default=False)  # New field
     is_active = models.BooleanField(default=False)
-
+    verification_token = models.UUIDField(default=uuid.uuid4, editable=False)  # Token for email verification
+    email_verified = models.BooleanField(default=False)  # Track if email is verified
 
     USERNAME_FIELD = 'email'  # Login using email
-    REQUIRED_FIELDS = ['username', 'phone_number']
+    REQUIRED_FIELDS = ['username']
 
     objects = CustomUserManager()
 
@@ -35,9 +34,9 @@ class CustomUser(AbstractUser):
         return self.email
 class Profile(models.Model):
     user=models.OneToOneField(CustomUser, on_delete=models.CASCADE,related_name='profile')
-    Phone_number = models.CharField(max_length=15, blank=True, null=True)
+    phone_number = models.CharField(max_length=15, blank=True, null=True)
     bio = models.TextField(blank=True, null=True)
-    Profile_photo = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
+    profile_photo = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

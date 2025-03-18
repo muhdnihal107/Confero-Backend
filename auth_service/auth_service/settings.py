@@ -177,5 +177,5 @@ EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'muhdnihal132@gmail.com'  # Replace with your email
-EMAIL_HOST_PASSWORD = 'muhd107' # Use an App Password if using Gmail
+EMAIL_HOST_PASSWORD = 'zpek ublv btdl ffpp' # Use an App Password if using Gmail
 DEFAULT_FROM_EMAIL = 'muhdnihal132@gmail.com'
