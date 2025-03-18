@@ -7,7 +7,7 @@ urlpatterns = [
     path('login/', LoginView.as_view(), name='login'),
     path('verify-email/<uuid:token>/', VerifyEmailView.as_view(), name='verify-email'),
     path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'),
-    path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
+    path('reset-password/<uuid:token>/', ResetPasswordView.as_view(), name='reset-password'),
     path('google/', GoogleAuthView.as_view(), name='google_login'),
     path('profile/', ProfileView.as_view(), name='profile'),# Add this
 ]

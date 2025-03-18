@@ -2,19 +2,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate
 from .models import CustomUser, Profile
 from .serializers import RegisterSerializer, LoginSerializer, ProfileSerializer, ForgotPasswordSerializer, ResetPasswordSerializer
 from social_django.utils import psa
-from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated
-from .utils import email_verification_token, password_reset_token
-from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
-from django.utils.encoding import force_str, force_bytes
 from django.core.mail import send_mail
 from django.urls import reverse
-from django.core.signing import Signer
-
+import uuid
+from django.contrib.auth.hashers import make_password
+from django.utils import timezone
 
 
 
@@ -123,31 +119,64 @@ class ProfileView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+#-------------------------------------------------------------------------------------
+
 class ForgotPasswordView(APIView):
     def post(self, request):
         serializer = ForgotPasswordSerializer(data=request.data)
         if serializer.is_valid():
             email = serializer.validated_data['email']
             user = CustomUser.objects.get(email=email)
-            uid = urlsafe_base64_encode(force_bytes(user.pk))
-            token = password_reset_token.make_token(user)
-            reset_link = request.build_absolute_uri(
-                reverse('reset-password') + f'?uid={uid}&token={token}'
-            )
+            user.reset_token = uuid.uuid4()
+            user.reset_token_expiry = timezone.now() + timezone.timedelta(hours=1)  # Token expires in 1 hour
+            user.save()
+
+            # Send reset email
+            frontend_url = f"http://localhost:5173/reset-password/{user.reset_token}/"
             send_mail(
-                subject='Reset Your Password',
-                message=f'Click this link to reset your password: {reset_link}',
-                from_email='muhdnihal132@gmail.com',  # Update with your email
-                recipient_list=[user.email],
+                'Password Reset Request',
+                f'Click the link to reset your password: {frontend_url}',
+                'muhdnihal132@gmail.com',
+                [user.email],
                 fail_silently=False,
             )
-            return Response({"message": "Password reset link sent"}, status=status.HTTP_200_OK)
+
+            return Response(
+                {"message": "Password reset link sent to your email."},
+                status=status.HTTP_200_OK,
+            )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+#-------------------------------------------------------------------------------------
+
 class ResetPasswordView(APIView):
-    def post(self, request):
+    def post(self, request, token):  # Accept the `token` argument
         serializer = ResetPasswordSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response({"message": "Password reset successfully"}, status=status.HTTP_200_OK)
+            new_password = serializer.validated_data['new_password']
+
+            try:
+                user = CustomUser.objects.get(reset_token=token)
+                if user.reset_token_expiry < timezone.now():
+                    return Response(
+                        {"message": "Reset token has expired."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                user.password = make_password(new_password)
+                user.reset_token = None  # Clear the reset token
+                user.reset_token_expiry = None  # Clear the expiry time
+                user.save()
+
+                return Response(
+                    {"message": "Password reset successfully."},
+                    status=status.HTTP_200_OK,
+                )
+            except CustomUser.DoesNotExist:
+                return Response(
+                    {"message": "Invalid reset token."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+           
