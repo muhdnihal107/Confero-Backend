@@ -17,6 +17,27 @@ services:
     dns:
       - 8.8.8.8
       - 8.8.4.4
+  
+  room_service:
+    build:
+      context: ./room_service
+      args:
+        - BUILD_DNS=8.8.8.8  # Optional: DNS for build phase
+    container_name: room_service
+    restart: always
+    depends_on:
+      confero_db:
+        condition: service_healthy
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./room_service:/app
+    command: python manage.py runserver 0.0.0.0:8001
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    environment:
+      - DATABASE_URL=postgresql://confero_user:confero_pass@confero_db:5432/confero_db
 
   confero_db:
     image: postgres:15

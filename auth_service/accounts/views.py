@@ -4,13 +4,17 @@ from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import CustomUser, Profile
 from .serializers import RegisterSerializer, LoginSerializer, ProfileSerializer, ForgotPasswordSerializer, ResetPasswordSerializer
-from social_django.utils import psa
 from rest_framework.permissions import IsAuthenticated
 from django.core.mail import send_mail
-from django.urls import reverse
 import uuid
 from django.contrib.auth.hashers import make_password
 from django.utils import timezone
+from django.contrib.auth import authenticate, login
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from google.oauth2 import id_token 
+from google.auth.transport import requests
+
 
 
 
@@ -20,12 +24,10 @@ class RegisterView(APIView):
         if serializer.is_valid():
             user = serializer.save()
 
-            # Generate verification URL
             verification_url = request.build_absolute_uri(
                 f"/api/auth/verify-email/{user.verification_token}/"
             )
 
-            # Send verification email
             send_mail(
                 'Verify your email',
                 f'Click the link to verify your email: {verification_url}',
@@ -48,7 +50,7 @@ class VerifyEmailView(APIView):
             user = CustomUser.objects.get(verification_token=token)
             if not user.email_verified:
                 user.email_verified = True
-                user.is_active = True  # Activate the user
+                user.is_active = True  
                 user.save()
                 return Response(
                     {"message": "Email verified successfully."},
@@ -83,20 +85,20 @@ class LoginView(APIView):
 
 # -------------------------------------------------------------------------------------
 
-class GoogleAuthView(APIView):
-    @psa('social:complete')
-    def post(self, request, backend):
-        try:
-            user = request.backend.do_auth(request.data.get('code'))  # Use 'code' instead of 'access_token'
-            if user:
-                refresh = RefreshToken.for_user(user)
-                return Response({
-                    "access_token": str(refresh.access_token),
-                    "refresh_token": str(refresh),
-                }, status=status.HTTP_200_OK)
-            return Response({'error': 'Authentication failed'}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+# class GoogleAuthView(APIView):
+#     @psa('social:complete')
+#     def post(self, request, backend):
+#         try:
+#             user = request.backend.do_auth(request.data.get('code'))  # Use 'code' instead of 'access_token'
+#             if user:
+#                 refresh = RefreshToken.for_user(user)
+#                 return Response({
+#                     "access_token": str(refresh.access_token),
+#                     "refresh_token": str(refresh),
+#                 }, status=status.HTTP_200_OK)
+#             return Response({'error': 'Authentication failed'}, status=status.HTTP_400_BAD_REQUEST)
+#         except Exception as e:
+#             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 # -------------------------------------------------------------------------------------
 
@@ -164,8 +166,8 @@ class ResetPasswordView(APIView):
                     )
 
                 user.password = make_password(new_password)
-                user.reset_token = None  # Clear the reset token
-                user.reset_token_expiry = None  # Clear the expiry time
+                user.reset_token = None  
+                user.reset_token_expiry = None  
                 user.save()
 
                 return Response(
@@ -179,4 +181,48 @@ class ResetPasswordView(APIView):
                 )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-           
+# ------------------------------------------------------------------------------------------
+import logging
+import json
+
+logger = logging.getLogger(__name__)
+
+GOOGLE_CLIENT_ID = "1092656538511-9g9vtc7715g4gsm088tjjiac7ksu9ita.apps.googleusercontent.com"
+
+@csrf_exempt
+def google_login(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            credential = data.get('credential')  
+
+            if not credential:
+                logger.error('Missing credential')
+                return JsonResponse({'error': 'Missing credential'}, status=400)
+
+            id_info = id_token.verify_oauth2_token(
+                credential,
+                requests.Request(),
+                GOOGLE_CLIENT_ID
+            )
+
+            if id_info['aud'] != GOOGLE_CLIENT_ID:
+                logger.error(f'Invalid audience: {id_info["aud"]}')
+                return JsonResponse({'error': 'Invalid audience'}, status=400)
+
+            email = id_info['email']
+            user, created = CustomUser.objects.get_or_create(email=email)
+            if created:
+                user.username = email
+                user.save()
+
+            login(request, user)
+            return JsonResponse({'message': 'Google login successful', 'user': {'email': user.email}})
+        except ValueError as e:
+            logger.error(f'Invalid Google token: {e}')
+            return JsonResponse({'error': 'Invalid Google token'}, status=400)
+        except json.JSONDecodeError:
+            logger.error('Invalid JSON payload')
+            return JsonResponse({'error': 'Invalid JSON payload'}, status=400)
+    return JsonResponse({'error': 'Invalid request method'}, status=405)
+

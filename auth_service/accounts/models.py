@@ -1,6 +1,8 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 import uuid
+
+
 class CustomUserManager(BaseUserManager):
     """Manager for CustomUser model"""
     def create_user(self, email, password=None, **extra_fields):
@@ -33,6 +35,8 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.email
+    
+    
 class Profile(models.Model):
     user=models.OneToOneField(CustomUser, on_delete=models.CASCADE,related_name='profile')
     phone_number = models.CharField(max_length=15, blank=True, null=True)
@@ -43,3 +47,14 @@ class Profile(models.Model):
 
     def __str__(self):
         return f"{self.user.username}'s Profile"
+
+class Friendship(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='friendships')
+    friend = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='friends')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'friend')
+
+    def __str__(self):
+        return f"{self.user.username} -> {self.friend.username}"

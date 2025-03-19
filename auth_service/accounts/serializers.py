@@ -1,9 +1,9 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import CustomUser,Profile
+from .models import CustomUser,Profile,Friendship
 from django.utils import timezone
 
-
+#------------------------------------------------------------------------------
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
 
@@ -20,6 +20,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
         return user
 
+#----------------------------------------------------------------------------------
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
@@ -29,7 +30,8 @@ class LoginSerializer(serializers.Serializer):
         if not user:
             raise serializers.ValidationError("Invalid credentials")
         return {'email': user.email}
-    
+
+#--------------------------------------------------------------------------------
 class ProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', required=False)  # Allow updating username
     email = serializers.EmailField(source='user.email', read_only=True)
@@ -38,20 +40,20 @@ class ProfileSerializer(serializers.ModelSerializer):
         fields = ['username','email','phone_number', 'bio', 'profile_photo']
         
         def update(self, instance, validated_data):
-        # Update user-related fields (username)
             user_data = validated_data.pop('user', {})
             if 'username' in user_data:
                 instance.user.username = user_data['username']
                 instance.user.save()
 
-            # Update profile fields
             instance.phone_number = validated_data.get('phone_number', instance.phone_number)
             instance.bio = validated_data.get('bio', instance.bio)
             if 'profile_photo' in validated_data:
                 instance.profile_photo = validated_data['profile_photo'] 
             instance.save()
             return instance
-        
+
+#--------------------------------------------------------------------------------
+     
 class ForgotPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
@@ -59,6 +61,8 @@ class ForgotPasswordSerializer(serializers.Serializer):
         if not CustomUser.objects.filter(email=value).exists():
             raise serializers.ValidationError("No user with this email exists.")
         return value
+
+#----------------------------------------------------------------------------------
     
 class ResetPasswordSerializer(serializers.Serializer):
     token = serializers.UUIDField()
@@ -72,3 +76,12 @@ class ResetPasswordSerializer(serializers.Serializer):
         except CustomUser.DoesNotExist:
             raise serializers.ValidationError("Invalid reset token.")
         return value
+    
+#----------------------------------------------------------------------------------
+
+class FriendshipSerializer(serializers.ModelSerializer):
+    friend = serializers.SlugRelatedField(slug_field='email', queryset=CustomUser.objects.all())
+
+    class Meta:
+        model = Friendship
+        fields = ['id', 'friend', 'created_at']
