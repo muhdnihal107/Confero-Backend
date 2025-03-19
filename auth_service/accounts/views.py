@@ -226,3 +226,10 @@ def google_login(request):
             return JsonResponse({'error': 'Invalid JSON payload'}, status=400)
     return JsonResponse({'error': 'Invalid request method'}, status=405)
 
+#-----------------------------------------------------------------------------------------------
+class FetchAllProflieView(APIView):
+    def get(self,request):
+        profiles = Profile.objects.all()
+        serializer = ProfileSerializer(profiles,many=True)
+        return Response(serializer.data,status=status.HTTP_200_OK)
+        

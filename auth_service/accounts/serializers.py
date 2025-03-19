@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import CustomUser,Profile,Friendship
+from .models import CustomUser,Profile
 from django.utils import timezone
 
 #------------------------------------------------------------------------------
@@ -79,9 +79,9 @@ class ResetPasswordSerializer(serializers.Serializer):
     
 #----------------------------------------------------------------------------------
 
-class FriendshipSerializer(serializers.ModelSerializer):
-    friend = serializers.SlugRelatedField(slug_field='email', queryset=CustomUser.objects.all())
+# class FriendshipSerializer(serializers.ModelSerializer):
+#     friend = serializers.SlugRelatedField(slug_field='email', queryset=CustomUser.objects.all())
 
-    class Meta:
-        model = Friendship
-        fields = ['id', 'friend', 'created_at']
+#     class Meta:
+#         model = Friendship
+#         fields = ['id', 'friend', 'created_at']
