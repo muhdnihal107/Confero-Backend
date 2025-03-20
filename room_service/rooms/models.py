@@ -13,7 +13,9 @@ class Room(models.Model):
     slug = models.SlugField(max_length=120, unique=True, blank=True)
     description = models.TextField(blank=True, null=True)
     visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default='public')
-    invited_users = models.JSONField(default=list)  
+    invited_users = models.JSONField(default=list)
+    thumbnail = models.ImageField(upload_to='room_thumbnails/',blank=True,null=True)
+    participants = models.JSONField(default=list)  
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

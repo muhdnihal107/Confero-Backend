@@ -1,43 +1,100 @@
+version: "3.9"
+
 services:
   auth_service:
     build:
       context: ./auth_service
       args:
-        - BUILD_DNS=8.8.8.8  # Optional: DNS for build phase
+        - BUILD_DNS=8.8.8.8
     container_name: auth_service
     restart: always
     depends_on:
       confero_db:
         condition: service_healthy
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./auth_service:/app
-    command: python manage.py runserver 0.0.0.0:8000
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
-  
-  room_service:
-    build:
-      context: ./room_service
-      args:
-        - BUILD_DNS=8.8.8.8  # Optional: DNS for build phase
-    container_name: room_service
-    restart: always
-    depends_on:
-      confero_db:
+      rabbitmq:
         condition: service_healthy
     ports:
-      - "8001:8001"
+      - "8000:8000"
+    expose:
+      - "8000"
     volumes:
-      - ./room_service:/app
-    command: python manage.py runserver 0.0.0.0:8001
+      - ./auth_service:/app
+    command: python manage.py runserver 0.0.0.0:8000 --noreload
     dns:
       - 8.8.8.8
       - 8.8.4.4
     environment:
       - DATABASE_URL=postgresql://confero_user:confero_pass@confero_db:5432/confero_db
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=admin
+      - RABBITMQ_PASS=adminpassword
+      - RABBITMQ_VHOST=/
+
+  auth_worker:
+    build:
+      context: ./auth_service
+    container_name: auth_worker
+    restart: always
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./auth_service:/app
+    command: python users/rabbitmq_worker.py
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=admin
+      - RABBITMQ_PASS=adminpassword
+      - RABBITMQ_VHOST=/
+
+  auth_room_event_worker:
+    build:
+      context: ./auth_service
+    container_name: auth_room_event_worker
+    restart: always
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./auth_service:/app
+    command: python users/room_event_worker.py
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=admin
+      - RABBITMQ_PASS=adminpassword
+      - RABBITMQ_VHOST=/
+  room_service:
+    build:
+      context: ./room_service
+      args:
+        - BUILD_DNS=8.8.8.8
+    container_name: room_service
+    restart: always
+    depends_on:
+      confero_db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "8001:8001"
+    expose:
+      - "8001"
+    volumes:
+      - ./room_service:/app
+    command: python manage.py runserver 0.0.0.0:8001 --noreload
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    environment:
+      - DATABASE_URL=postgresql://confero_user:confero_pass@confero_db:5432/confero_db
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=admin
+      - RABBITMQ_PASS=adminpassword
+      - RABBITMQ_VHOST=/
 
   confero_db:
     image: postgres:15
@@ -57,5 +114,25 @@ services:
       timeout: 5s
       retries: 5
 
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=adminpassword
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
 volumes:
   postgres_data:
+  rabbitmq_data:

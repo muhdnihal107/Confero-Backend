@@ -45,3 +45,37 @@ class PublicRoomsView(APIView):
         public_rooms = Room.objects.filter(visibility='public')
         serializer = PublicRoomSerializer(public_rooms, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+from utils.rabbitmq import RabbitMQClient
+
+class JoinRoomView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, slug):
+        user_email = request.user.email
+        try:
+            room = Room.objects.get(slug=slug)
+            if room.visibility == 'public' or user_email in room.invited_users or user_email == room.creator_email:
+                if user_email not in room.participants:
+                    room.participants.append(user_email)
+                    room.save()
+
+                    # Publish a message to RabbitMQ
+                    rabbitmq_client = RabbitMQClient()
+                    rabbitmq_client.connect()
+                    rabbitmq_client.publish_message(
+                        queue_name='room_events',
+                        message={
+                            'event': 'user_joined',
+                            'room_id': room.id,
+                            'room_name': room.name,
+                            'user_email': user_email
+                        }
+                    )
+                    rabbitmq_client.close()
+
+                return Response({"message": "Joined room successfully"}, status=status.HTTP_200_OK)
+            return Response({"error": "You are not authorized to join this room"}, status=status.HTTP_403_FORBIDDEN)
+        except Room.DoesNotExist:
+            return Response({"error": "Room not found"}, status=status.HTTP_404_NOT_FOUND)

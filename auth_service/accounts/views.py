@@ -232,4 +232,45 @@ class FetchAllProflieView(APIView):
         profiles = Profile.objects.all()
         serializer = ProfileSerializer(profiles,many=True)
         return Response(serializer.data,status=status.HTTP_200_OK)
-        
+
+#--------------------------------------------------------------------------------
+from rest_framework_simplejwt.tokens import AccessToken
+from utils.rabbitmq import RabbitMQClient
+
+class ValidateTokenView(APIView):
+    def post(self, request):
+        token = request.data.get('token')
+        if not token:
+            return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            access_token = AccessToken(token)
+            user_id = access_token['user_id']
+            email = access_token['email']
+            # Publish the validation result to RabbitMQ
+            rabbitmq_client = RabbitMQClient()
+            rabbitmq_client.connect()
+            rabbitmq_client.publish_message(
+                queue_name='auth_response_queue',
+                message={
+                    'valid': True,
+                    'user_id': user_id,
+                    'email': email,
+                    'request_id': request.data.get('request_id')
+                }
+            )
+            rabbitmq_client.close()
+            return Response({"message": "Token validation request sent"}, status=status.HTTP_200_OK)
+        except Exception as e:
+            rabbitmq_client = RabbitMQClient()
+            rabbitmq_client.connect()
+            rabbitmq_client.publish_message(
+                queue_name='auth_response_queue',
+                message={
+                    'valid': False,
+                    'error': str(e),
+                    'request_id': request.data.get('request_id')
+                }
+            )
+            rabbitmq_client.close()
+            return Response({"error": "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)      
