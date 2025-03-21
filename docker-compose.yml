@@ -14,7 +14,7 @@ services:
       rabbitmq:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      - "8002:8000"
     expose:
       - "8000"
     volumes:
@@ -41,7 +41,7 @@ services:
         condition: service_healthy
     volumes:
       - ./auth_service:/app
-    command: python users/rabbitmq_worker.py
+    command: python accounts/rabbitmq_worker.py
     environment:
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
@@ -59,7 +59,7 @@ services:
         condition: service_healthy
     volumes:
       - ./auth_service:/app
-    command: python users/room_event_worker.py
+    command: python accounts/room_event_worker.py
     environment:
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
@@ -129,10 +129,49 @@ services:
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 15s
-      timeout: 10s
+      timeout: 20s
       retries: 5
-      start_period: 30s
+      start_period: 90s
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  notification_service:
+    build:
+      context: ./notification_service
+    container_name: notification_service
+    restart: always
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8003:8003"  # Map port 8003 on the host to 8003 in the container
+    volumes:
+      - ./notification_service:/app
+    command: python manage.py runserver 0.0.0.0:8003
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=admin
+      - RABBITMQ_PASS=adminpassword
+      - RABBITMQ_VHOST=/
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
 
 volumes:
   postgres_data:
   rabbitmq_data:
+  redis_data:
