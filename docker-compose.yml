@@ -158,10 +158,10 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "8003:8003"  # Map port 8003 on the host to 8003 in the container
+      - "8003:8003"
     volumes:
       - ./notification_service:/app
-    command: python manage.py runserver 0.0.0.0:8003
+    command: daphne -b 0.0.0.0 -p 8003 notification_service.asgi:application  # Use daphne instead of runserver
     environment:
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672

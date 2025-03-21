@@ -5,6 +5,7 @@ django-cors-headers>=4.7.0,<4.8
 
 channels==4.0.0
 channels-redis==4.1.0
+daphne==4.0.0  # Add this line
 # Database
 psycopg2-binary>=2.9.10,<2.10
 
