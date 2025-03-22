@@ -273,4 +273,12 @@ class ValidateTokenView(APIView):
                 }
             )
             rabbitmq_client.close()
-            return Response({"error": "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)      
+            return Response({"error": "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)  
+        
+#---------------------------------------------------------------------------------------------------
+from django.http import JsonResponse
+from django.contrib.auth.models import User
+from utils.rabbitmq import RabbitMQClient
+
+
+    

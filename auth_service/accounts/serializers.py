@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import CustomUser,Profile
+from .models import CustomUser,Profile,FriendRequest,Friendship
 from django.utils import timezone
 
 #------------------------------------------------------------------------------
@@ -79,9 +79,32 @@ class ResetPasswordSerializer(serializers.Serializer):
     
 #----------------------------------------------------------------------------------
 
-# class FriendshipSerializer(serializers.ModelSerializer):
-#     friend = serializers.SlugRelatedField(slug_field='email', queryset=CustomUser.objects.all())
+class FriendshipSerializer(serializers.ModelSerializer):
+    friend = serializers.SlugRelatedField(slug_field='email', queryset=CustomUser.objects.all())
 
-#     class Meta:
-#         model = Friendship
-#         fields = ['id', 'friend', 'created_at']
+    class Meta:
+        model = Friendship
+        fields = ['id', 'friend', 'created_at']
+        
+#---------------------------------------------------------------------------------------------------
+
+class FriendRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FriendRequest
+        fields = ['id','sender','receiver', 'receiver_id','status','created_at']
+    
+    def validate_reciever_id(self,value):
+        if not CustomUser.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Receiver Does Not Exist")
+        if value == self.context['request'].user.id:
+            raise serializers.ValidationError("you cannot sent friend request to yourself")
+        return value
+    
+    def create(self,validated_data):
+        receiver_id = validated_data.pop('receiver_id')
+        receiver = CustomUser.objects.get(id=receiver_id)
+        sender = self.context['request'].user
+        friend_request = FriendRequest.objects.create(sender=sender,receiver=receiver,**validated_data)
+        
+        
+        

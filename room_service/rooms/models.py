@@ -31,3 +31,10 @@ class Room(models.Model):
 
     def __str__(self):
         return self.name
+    
+class RoomInvite(models.Model):
+    room = models.ForeignKey(Room,on_delete=models.CASCADE)
+    inviter_id = models.IntegerField()
+    invitee_id = models.IntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    
