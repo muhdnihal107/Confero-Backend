@@ -4,7 +4,7 @@ from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import CustomUser, Profile,Friendship,FriendRequest
 from .serializers import RegisterSerializer, LoginSerializer, ProfileSerializer, ForgotPasswordSerializer, ResetPasswordSerializer,FriendRequestSerializer
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated,AllowAny
 from django.core.mail import send_mail
 import uuid
 from django.contrib.auth.hashers import make_password
@@ -236,43 +236,19 @@ class FetchAllProflieView(APIView):
 #--------------------------------------------------------------------------------
 from rest_framework_simplejwt.tokens import AccessToken
 from utils.rabbitmq import RabbitMQClient
-
+from rest_framework_simplejwt.authentication import JWTAuthentication
 class ValidateTokenView(APIView):
+    permission_classes = [AllowAny]
     def post(self, request):
         token = request.data.get('token')
         if not token:
             return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
-
+        jwt_auth = JWTAuthentication()
         try:
-            access_token = AccessToken(token)
-            user_id = access_token['user_id']
-            email = access_token['email']
-            # Publish the validation result to RabbitMQ
-            rabbitmq_client = RabbitMQClient()
-            rabbitmq_client.connect()
-            rabbitmq_client.publish_message(
-                queue_name='auth_response_queue',
-                message={
-                    'valid': True,
-                    'user_id': user_id,
-                    'email': email,
-                    'request_id': request.data.get('request_id')
-                }
-            )
-            rabbitmq_client.close()
-            return Response({"message": "Token validation request sent"}, status=status.HTTP_200_OK)
+            validated_token = jwt_auth.get_validated_token(token)
+            user = jwt_auth.get_user(validated_token)
+            return Response({"user_id": user.id, "email": user.email},status=status.HTTP_200_OK)
         except Exception as e:
-            rabbitmq_client = RabbitMQClient()
-            rabbitmq_client.connect()
-            rabbitmq_client.publish_message(
-                queue_name='auth_response_queue',
-                message={
-                    'valid': False,
-                    'error': str(e),
-                    'request_id': request.data.get('request_id')
-                }
-            )
-            rabbitmq_client.close()
             return Response({"error": "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)  
         
 #---------------------------------------------------------------------------------------------------

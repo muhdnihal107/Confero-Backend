@@ -148,6 +148,15 @@ REST_FRAMEWORK = {
     ],
 }
 
+from datetime import timedelta
+
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=2),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'SIGNING_KEY': 'your-shared-signing-key',
+}
+
 RABBITMQ = {
     'HOST': 'rabbitmq',
     'PORT': 5672,

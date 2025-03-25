@@ -161,6 +161,7 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=2),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'SIGNING_KEY': 'your-shared-signing-key',
 }
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  
