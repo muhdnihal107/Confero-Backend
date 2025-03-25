@@ -147,3 +147,11 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
+
+RABBITMQ = {
+    'HOST': 'rabbitmq',
+    'PORT': 5672,
+    'VHOST': '/',
+    'USER': 'admin',
+    'PASSWORD': 'adminpassword',
+}
