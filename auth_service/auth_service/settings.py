@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-+a0^n%s1nc84lwdl0&ms#=tyt3jb8=t$16)(%+=hie2g81_vdt
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'auth_service']
 
 
 # Application definition
@@ -194,3 +194,13 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'muhdnihal132@gmail.com'  # Replace with your email
 EMAIL_HOST_PASSWORD = 'zpek ublv btdl ffpp' # Use an App Password if using Gmail
 DEFAULT_FROM_EMAIL = 'muhdnihal132@gmail.com'
+
+
+# Add to the bottom of settings.py
+RABBITMQ = {
+    'HOST': 'rabbitmq',
+    'PORT': 5672,
+    'VHOST': '/',
+    'USER': 'admin',
+    'PASSWORD': 'adminpassword',
+}

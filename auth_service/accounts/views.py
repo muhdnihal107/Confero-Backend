@@ -2,8 +2,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import CustomUser, Profile
-from .serializers import RegisterSerializer, LoginSerializer, ProfileSerializer, ForgotPasswordSerializer, ResetPasswordSerializer
+from .models import CustomUser, Profile,Friendship,FriendRequest
+from .serializers import RegisterSerializer, LoginSerializer, ProfileSerializer, ForgotPasswordSerializer, ResetPasswordSerializer,FriendRequestSerializer
 from rest_framework.permissions import IsAuthenticated
 from django.core.mail import send_mail
 import uuid
@@ -276,9 +276,38 @@ class ValidateTokenView(APIView):
             return Response({"error": "Invalid token"}, status=status.HTTP_401_UNAUTHORIZED)  
         
 #---------------------------------------------------------------------------------------------------
-from django.http import JsonResponse
-from django.contrib.auth.models import User
-from utils.rabbitmq import RabbitMQClient
 
-
+class FriendRequestView(APIView):
+    permission_classes = [IsAuthenticated]
     
+    def post(self,request):
+        serializer = FriendRequestSerializer(data=request.data, context={'request':request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Friend request sent"}, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+#-------------------------------------------------------------------------------------------------- 
+
+class FriendRequestActionView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self,request,request_id):
+        try:
+            friend_request = FriendRequest.objects.get(id=request_id, receiver= request.user)
+            action = request.data('action')
+            
+            if action == 'accept':
+                friend_request.status = 'accepted'
+                friend_request.save()
+                
+                Friendship.objects.create(user=friend_request.sender,friend = friend_request.receiver)
+                Friendship.objects.create(user=friend_request.receiver,friend= friend_request.sender)
+            elif action == 'reject':
+                friend_request.status = 'rejected'
+                friend_request.save()
+                return Response({"message": "Friend request rejected"}, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
+        except FriendRequest.DoesNotExist:
+            return Response({"error": "Friend request not found"}, status=status.HTTP_404_NOT_FOUND)
