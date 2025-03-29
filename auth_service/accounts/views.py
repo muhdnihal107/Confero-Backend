@@ -3,10 +3,11 @@ from rest_framework.views import APIView
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import CustomUser, Profile,Friendship,FriendRequest
-from .serializers import RegisterSerializer, LoginSerializer, ProfileSerializer, ForgotPasswordSerializer, ResetPasswordSerializer,FriendRequestSerializer
+from .serializers import RegisterSerializer, LoginSerializer, ProfileSerializer, ForgotPasswordSerializer, ResetPasswordSerializer,FriendRequestSerializer, UserSerializer
 from rest_framework.permissions import IsAuthenticated,AllowAny
 from django.core.mail import send_mail
 import uuid
+import logging
 from django.contrib.auth.hashers import make_password
 from django.utils import timezone
 from django.contrib.auth import authenticate, login
@@ -14,8 +15,11 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from google.oauth2 import id_token 
 from google.auth.transport import requests
+from django.shortcuts import get_object_or_404
 
+logging.basicConfig(level=logging.DEBUG)
 
+logger = logging.getLogger("django")
 
 
 class RegisterView(APIView):
@@ -42,6 +46,15 @@ class RegisterView(APIView):
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+# -------------------------------------------------------------------------------------
+
+class UserListView(APIView):
+    # permission_classes = [IsAuthenticated]  # Require authentication
+
+    def get(self, request):
+        users = CustomUser.objects.all()
+        serializer = UserSerializer(users, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 # -------------------------------------------------------------------------------------
 
 class VerifyEmailView(APIView):
@@ -235,7 +248,6 @@ class FetchAllProflieView(APIView):
 
 #--------------------------------------------------------------------------------
 from rest_framework_simplejwt.tokens import AccessToken
-from utils.rabbitmq import RabbitMQClient
 from rest_framework_simplejwt.authentication import JWTAuthentication
 class ValidateTokenView(APIView):
     permission_classes = [AllowAny]
@@ -253,37 +265,124 @@ class ValidateTokenView(APIView):
         
 #---------------------------------------------------------------------------------------------------
 
+
 class FriendRequestView(APIView):
-    permission_classes = [IsAuthenticated]
-    
-    def post(self,request):
-        serializer = FriendRequestSerializer(data=request.data, context={'request':request})
-        if serializer.is_valid():
-            serializer.save()
-            return Response({"message": "Friend request sent"}, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def post(self, request, *args, **kwargs):
+        sender = request.user  # The logged-in user
+        receiver_id = request.data.get("receiver_id")
+        receiver = get_object_or_404(CustomUser, id=receiver_id)
+
+        if FriendRequest.objects.filter(sender=sender, receiver=receiver).exists():
+            return Response({"error": "Friend request already sent."}, status=status.HTTP_400_BAD_REQUEST)
+
+        friend_request = FriendRequest.objects.create(sender=sender, receiver=receiver)
+
+        logger.info("test1")
+        self.send_notification(friend_request)
+
+        return Response({"message": "Friend request sent!"}, status=status.HTTP_201_CREATED)
+
+    def send_notification(self, friend_request):
+        """Sends a RabbitMQ message to the notification service"""
+        logger.info("test2")
+        try:
+            credentials = pika.PlainCredentials(
+                os.getenv('RABBITMQ_USER', 'admin'),
+                os.getenv('RABBITMQ_PASS', 'adminpassword')
+            )
+            connection = pika.BlockingConnection(
+                pika.ConnectionParameters(
+                    host=os.getenv('RABBITMQ_HOST', 'rabbitmq'),
+                    port=int(os.getenv('RABBITMQ_PORT', 5672)),
+                    credentials=credentials
+                )
+            )
+            channel = connection.channel()
+            channel.queue_declare(queue="notification_queue", durable=True)
+
+            notification_data = {
+                "receiver_id": str(friend_request.receiver.id),
+                "message": f"{friend_request.sender.username} sent you a friend request.",
+                "type": "friend_request",
+                "friend_request_id": str(friend_request.id),
+            }
+
+            channel.basic_publish(
+                exchange="",
+                routing_key="notification_queue",
+                body=json.dumps(notification_data)
+            )
+
+            connection.close()
+        except Exception as e:
+            print(f"Error sending notification: {e}")
+
     
 #-------------------------------------------------------------------------------------------------- 
-
+import os
+import pika
+# In views.py
 class FriendRequestActionView(APIView):
     permission_classes = [IsAuthenticated]
     
-    def post(self,request,request_id):
+    def send_notification(self, receiver_id, sender_id, action):
+        message = {
+            "receiver_id": receiver_id,
+            "message": f"Your friend request was {action}.",
+            "type":f"friend_request_{action}"
+        }
         try:
-            friend_request = FriendRequest.objects.get(id=request_id, receiver= request.user)
-            action = request.data('action')
+            credentials = pika.PlainCredentials(
+                os.getenv('RABBITMQ_USER', 'admin'),
+                os.getenv('RABBITMQ_PASS', 'adminpassword')                
+            )
+            connection = pika.BlockingConnection(
+                pika.ConnectionParameters(
+                    host=os.getenv('RABBITMQ_HOST', 'rabbitmq'),
+                    port=int(os.getenv('RABBITMQ_PORT', 5672)),
+                    credentials=credentials
+                )
+            )
+            channel = connection.channel()
+            channel.queue_declare(queue="notification_queue", durable=True)
+            channel.basic_publish(
+                exchange="",
+                routing_key="notification_queue",
+                body=json.dumps(message)
+            )
+            connection.close()
+        except Exception as e:
+            print(f"Failed to send notification: {e}")
+
+
+    def post(self, request, request_id):
+        try:
+            friend_request = FriendRequest.objects.get(id=request_id)
+            action = request.data.get('action')  # Fix: Use .get() to safely access 'action'
             
             if action == 'accept':
                 friend_request.status = 'accepted'
                 friend_request.save()
                 
-                Friendship.objects.create(user=friend_request.sender,friend = friend_request.receiver)
-                Friendship.objects.create(user=friend_request.receiver,friend= friend_request.sender)
+                Friendship.objects.create(user=friend_request.sender, friend=friend_request.receiver)
+                Friendship.objects.create(user=friend_request.receiver, friend=friend_request.sender)
+                
+                # Send notification to sender
+                self.send_notification(friend_request.sender.id, friend_request.receiver.id, "accepted")                 
+                
+                return Response({"message": "Friend request accepted"}, status=status.HTTP_200_OK)
+            
             elif action == 'reject':
                 friend_request.status = 'rejected'
                 friend_request.save()
+                
+                # Send notification to sender (optional)
+                self.send_notification(friend_request.sender.id, friend_request.receiver.id, "rejected")
                 return Response({"message": "Friend request rejected"}, status=status.HTTP_200_OK)
+            
             else:
                 return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
         except FriendRequest.DoesNotExist:
             return Response({"error": "Friend request not found"}, status=status.HTTP_404_NOT_FOUND)
+
+ 

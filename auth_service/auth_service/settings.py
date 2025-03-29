@@ -151,17 +151,23 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'  # BASE_DIR is already defined
 
 from datetime import timedelta
-
+import os
+# auth_service/settings.py
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',  # Use the custom permission
     ],
 }
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=2),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'SIGNING_KEY': 'your-shared-signing-key',
+    'SIGNING_KEY': os.getenv('JWT_SIGNING_KEY', 'your-shared-jwt-signing-key-here'),
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
 }
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  
@@ -201,7 +207,7 @@ DEFAULT_FROM_EMAIL = 'muhdnihal132@gmail.com'
 RABBITMQ = {
     'HOST': 'rabbitmq',
     'PORT': 5672,
-    'VHOST': '/',
     'USER': 'admin',
     'PASSWORD': 'adminpassword',
+    'VHOST': '/',
 }

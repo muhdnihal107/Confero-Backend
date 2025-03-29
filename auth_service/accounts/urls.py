@@ -1,8 +1,9 @@
 
 from django.urls import path
-from .views import RegisterView, LoginView,ProfileView,VerifyEmailView,ForgotPasswordView,ResetPasswordView,google_login,FetchAllProflieView,ValidateTokenView,FriendRequestView,FriendRequestActionView
+from .views import RegisterView, LoginView,ProfileView,VerifyEmailView,ForgotPasswordView,ResetPasswordView,google_login,FetchAllProflieView,ValidateTokenView,FriendRequestView,FriendRequestActionView, UserListView
 
 urlpatterns = [
+    path('users/', UserListView.as_view(), name='register'),
     path('register/', RegisterView.as_view(), name='register'),
     path('login/', LoginView.as_view(), name='login'),
     path('verify-email/<uuid:token>/', VerifyEmailView.as_view(), name='verify-email'),

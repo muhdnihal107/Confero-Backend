@@ -19,5 +19,5 @@ from django.urls import path,include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('notifications.urls')),  # We’ll create this next
+    path('api/', include('notifications.urls')),  # We’ll create this next
 ]

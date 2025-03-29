@@ -11,7 +11,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
-
+import os
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-h1(%awi-^geh@26o^p6ey+!eu0s&hqz!jf#8q%iic(q9ab6%tb
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -38,8 +38,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework_simplejwt',
     'notifications',  # Your app
-    'channels',
 ]
 
 MIDDLEWARE = [
@@ -53,6 +53,17 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'notification_service.urls'
+
+# ASGI_APPLICATION = 'notification_service.asgi.application'
+
+# CHANNEL_LAYERS = {
+#     "default": {
+#         "BACKEND": "channels_redis.core.RedisChannelLayer",
+#         "CONFIG": {
+#             "hosts": [(os.getenv("REDIS_HOST", "redis"), int(os.getenv("REDIS_PORT", 6379)))],
+#         },
+#     },
+# }
 
 TEMPLATES = [
     {
@@ -69,22 +80,6 @@ TEMPLATES = [
         },
     },
 ]
-ASGI_APPLICATION = 'notification_service.asgi.application'
-
-# Configure channel layer with Redis
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            "hosts": [('redis', 6379)],  # Use the Redis service name and port
-        },
-    },
-}
-WSGI_APPLICATION = 'notification_service.wsgi.application'
-
-
-# Database
-# https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 DATABASES = {
     'default': {
@@ -96,6 +91,27 @@ DATABASES = {
         'PORT': '5432',
     }
 }
+
+
+# Configure channel layer with Redis
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+
+}
+
+
+
+
+
+WSGI_APPLICATION = 'notification_service.wsgi.application'
+
+
+# Database
+# https://docs.djangoproject.com/en/5.1/ref/settings/#databases
+
+
 
 
 # Password validation
@@ -139,14 +155,6 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
-    ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
-    ],
-}
 
 from datetime import timedelta
 
@@ -154,13 +162,13 @@ from datetime import timedelta
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=2),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'SIGNING_KEY': 'your-shared-signing-key',
+    'SIGNING_KEY': 'your-shared-jwt-signing-key-here',  # Must match auth_service
 }
 
 RABBITMQ = {
     'HOST': 'rabbitmq',
     'PORT': 5672,
-    'VHOST': '/',
     'USER': 'admin',
     'PASSWORD': 'adminpassword',
+    'VHOST': '/',
 }

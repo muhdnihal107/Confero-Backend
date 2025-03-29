@@ -5,6 +5,22 @@ from django.utils import timezone
 import pika 
 import json
 from django.conf import settings
+import os
+#------------------------------------------------------------------------------
+
+
+# from rest_framework import serializers
+# from django.contrib.auth import get_user_model
+
+# User = get_user_model()
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = '__all__'
+
+
+
 #------------------------------------------------------------------------------
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
@@ -90,63 +106,73 @@ class FriendshipSerializer(serializers.ModelSerializer):
         
 #---------------------------------------------------------------------------------------------------
 
-class FriendRequestSerializer(serializers.ModelSerializer):
-    receiver_id = serializers.IntegerField(write_only=True)  # Input field for receiver's ID
 
+class FriendRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = FriendRequest
-        fields = ['id', 'sender', 'receiver', 'receiver_id', 'status', 'created_at']
-        read_only_fields = ['sender', 'receiver', 'created_at']  # receiver is read-only in output
+        fields = "__all__"
 
-    def validate_receiver_id(self, value):
-        if not CustomUser.objects.filter(id=value).exists():
-            raise serializers.ValidationError("Receiver does not exist")
-        if value == self.context['request'].user.id:
-            raise serializers.ValidationError("You cannot send a friend request to yourself")
-        return value
 
-    def create(self, validated_data):
-        receiver_id = validated_data.pop('receiver_id')  # Get receiver_id from input
-        receiver = CustomUser.objects.get(id=receiver_id)  # Fetch the receiver object
-        sender = self.context['request'].user  # Sender is the authenticated user
+# class FriendRequestSerializer(serializers.ModelSerializer):
+#     receiver_id = serializers.IntegerField(write_only=True)
+
+#     class Meta:
+#         model = FriendRequest
+#         fields = ['id', 'sender', 'receiver', 'receiver_id', 'status', 'created_at']
+#         read_only_fields = ['sender', 'receiver', 'created_at']
+
+#     def validate_receiver_id(self, value):
+#         if not CustomUser.objects.filter(id=value).exists():
+#             raise serializers.ValidationError("Receiver does not exist")
+#         if value == self.context['request'].user.id:
+#             raise serializers.ValidationError("You cannot send a friend request to yourself")
+#         return value
+
+#     def create(self, validated_data):
+#         receiver_id = validated_data.pop('receiver_id')
+#         receiver = CustomUser.objects.get(id=receiver_id)
+#         sender = self.context['request'].user
         
-        # Create the friend request with sender and receiver objects
-        friend_request = FriendRequest.objects.create(
-            sender=sender,
-            receiver=receiver,
-            status='pending'  # Default status, no need to pass from validated_data unless overridden
-        )
-        self.send_notification(sender, receiver, friend_request)
-        return friend_request
+#         friend_request = FriendRequest.objects.create(
+#             sender=sender,
+#             receiver=receiver,
+#             status='pending'
+#         )
+#         self.send_notification(sender, receiver, friend_request)
+#         return friend_request
 
-    def send_notification(self, sender, receiver, friend_request):
-        credentials = pika.PlainCredentials(settings.RABBITMQ['USER'], settings.RABBITMQ['PASSWORD'])
-        parameters = pika.ConnectionParameters(
-            host=settings.RABBITMQ['HOST'],
-            port=settings.RABBITMQ['PORT'],
-            virtual_host=settings.RABBITMQ['VHOST'],
-            credentials=credentials
-        )
-        connection = pika.BlockingConnection(parameters)
-        channel = connection.channel()
-
-        channel.queue_declare(queue='friend_request_notifications', durable=True)
-
-        message = {
-            'type': 'friend_request',
-            'sender_id': sender.id,
-            'sender_email': sender.email,
-            'receiver_id': receiver.id,
-            'friend_request_id': friend_request.id,
-            'created_at': friend_request.created_at.isoformat()
-        }
-
-        channel.basic_publish(
-            exchange='',
-            routing_key='friend_request_notifications',
-            body=json.dumps(message),
-            properties=pika.BasicProperties(delivery_mode=2)
-        )
-        connection.close()
+#     def send_notification(self, sender, receiver, friend_request):
+#         # Publish message to notification_service_queue using pika
+#         credentials = pika.PlainCredentials(
+#             os.getenv('RABBITMQ_USER', 'admin'),
+#             os.getenv('RABBITMQ_PASS', 'adminpassword')
+#         )
+#         connection = pika.BlockingConnection(
+#             pika.ConnectionParameters(
+#                 host=os.getenv('RABBITMQ_HOST', 'rabbitmq'),
+#                 port=int(os.getenv('RABBITMQ_PORT', 5672)),
+#                 credentials=credentials,
+#                 virtual_host=os.getenv('RABBITMQ_VHOST', '/')
+#             )
+#         )
+#         channel = connection.channel()
+#         channel.queue_declare(queue='notification_service_queue', durable=True)
         
+#         message = {
+#             'type': 'friend_request',
+#             'sender_id': sender.id,
+#             'sender_email': sender.email,
+#             'receiver_id': receiver.id,
+#             'friend_request_id': friend_request.id,
+#             'message': f"{sender.email} sent you a friend request",
+#             'notification_type': 'friend_request',
+#             'related_id': friend_request.id,
+#             'created_at': friend_request.created_at.isoformat()
+#         }
+#         channel.basic_publish(
+#             exchange='',
+#             routing_key='notification_service_queue',
+#             body=json.dumps(message).encode()
+#         )
+#         connection.close()
         

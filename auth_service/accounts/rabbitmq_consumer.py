@@ -1,58 +1,78 @@
-# auth_service/rabbitmq_consumer.py
-import pika
+
 import json
-from django.conf import settings
-import jwt
-from rest_framework_simplejwt.tokens import AccessToken
+import pika
+import os
+import time
+import django
+import sys
 
-def validate_token(token):
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "auth_service.settings")
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+django.setup()
+
+from accounts.models import CustomUser
+
+def process_message(ch, method, properties, body):
+    user_request = json.loads(body)
+    user_id = user_request.get("user_id")
+
+    print(f"Auth Service: Processing request for user {user_id}")
+
     try:
-        # Verify token (assuming you're using SimpleJWT)
-        access_token = AccessToken(token)
-        return {'status': 'success', 'user_id': access_token['user_id']}
-    except jwt.InvalidTokenError:
-        return {'status': 'error', 'message': 'Invalid token'}
+        user = CustomUser.objects.get(id=user_id)
+        user_data = {
+            "id": user.id,
+            "email": user.email,
+        }
+    except CustomUser.DoesNotExist:
+        user_data = {"error": "User not found"}
 
-def callback(ch, method, props, body):
-    data = json.loads(body.decode())
-    token = data.get('token')
-    response = validate_token(token)
+    response = json.dumps(user_data)
 
-    # Send response back to notification_service
-    connection = pika.BlockingConnection(
-        pika.ConnectionParameters(
-            host=settings.RABBITMQ_HOST,
-            port=settings.RABBITMQ_PORT,
-            credentials=pika.PlainCredentials(settings.RABBITMQ_USER, settings.RABBITMQ_PASSWORD),
-            virtual_host=settings.RABBITMQ_VHOST
+    if properties.reply_to:
+        ch.basic_publish(
+            exchange="",
+            routing_key=properties.reply_to,
+            properties=pika.BasicProperties(correlation_id=properties.correlation_id),
+            body=response.encode(),
         )
-    )
-    channel = connection.channel()
-    channel.basic_publish(
-        exchange='',
-        routing_key=props.reply_to,
-        body=json.dumps(response).encode(),
-        properties=pika.BasicProperties(
-            correlation_id=props.correlation_id
-        )
-    )
-    connection.close()
+        print(f"Auth Service: Sent response to {properties.reply_to}")
 
-def start_consuming():
-    connection = pika.BlockingConnection(
-        pika.ConnectionParameters(
-            host=settings.RABBITMQ_HOST,
-            port=settings.RABBITMQ_PORT,
-            credentials=pika.PlainCredentials(settings.RABBITMQ_USER, settings.RABBITMQ_PASSWORD),
-            virtual_host=settings.RABBITMQ_VHOST
-        )
-    )
-    channel = connection.channel()
-    channel.queue_declare(queue='auth_request_queue', durable=True)
-    channel.basic_consume(queue='auth_request_queue', on_message_callback=callback, auto_ack=True)
-    print(" [*] Waiting for messages in auth_service...")
-    channel.start_consuming()
+    ch.basic_ack(delivery_tag=method.delivery_tag)
 
-if __name__ == "__main__":
-    start_consuming()
+def start_rabbitmq_consumer():
+    max_retries = 10
+    retry_delay = 5  # seconds
+    attempt = 0
 
+    while attempt < max_retries:
+        try:
+            credentials = pika.PlainCredentials(
+                os.getenv('RABBITMQ_USER', 'admin'),
+                os.getenv('RABBITMQ_PASS', 'adminpassword')
+            )
+            connection = pika.BlockingConnection(
+                pika.ConnectionParameters(
+                    host=os.getenv('RABBITMQ_HOST', 'rabbitmq'),
+                    port=int(os.getenv('RABBITMQ_PORT', 5672)),
+                    credentials=credentials,
+                    virtual_host=os.getenv('RABBITMQ_VHOST', '/')
+                )
+            )
+            channel = connection.channel()
+            channel.queue_declare(queue="auth_service_queue", durable=True)
+            channel.basic_consume(queue="auth_service_queue", on_message_callback=process_message)
+
+            print("✅ Auth Service: Waiting for messages...")
+            channel.start_consuming()
+            break  # Exit loop if successful
+        except pika.exceptions.AMQPConnectionError as e:
+            attempt += 1
+            print(f"Failed to connect to RabbitMQ (attempt {attempt}/{max_retries}): {e}")
+            if attempt < max_retries:
+                time.sleep(retry_delay)
+            else:
+                print("Max retries reached. RabbitMQ consumer failed to start.")
+                raise

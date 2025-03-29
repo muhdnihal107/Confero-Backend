@@ -1,10 +1,10 @@
+# docker-compose.yml
+version: '3.8'
 
 services:
   auth_service:
     build:
       context: ./auth_service
-      args:
-        - BUILD_DNS=8.8.8.8
     container_name: auth_service
     restart: always
     depends_on:
@@ -13,15 +13,11 @@ services:
       rabbitmq:
         condition: service_healthy
     ports:
-      - "8002:8000"
-    expose:
-      - "8000"
+      - "8000:8000"
     volumes:
       - ./auth_service:/app
-    command: python manage.py runserver 0.0.0.0:8000 --noreload
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
+    command: >
+      sh -c "python manage.py runserver 0.0.0.0:8000"
     environment:
       - DATABASE_URL=postgresql://confero_user:confero_pass@confero_db:5432/confero_db
       - RABBITMQ_HOST=rabbitmq
@@ -29,47 +25,11 @@ services:
       - RABBITMQ_USER=admin
       - RABBITMQ_PASS=adminpassword
       - RABBITMQ_VHOST=/
+      - JWT_SIGNING_KEY=your-shared-jwt-signing-key-here
 
-  auth_worker:
-    build:
-      context: ./auth_service
-    container_name: auth_worker
-    restart: always
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    volumes:
-      - ./auth_service:/app
-    command: python accounts/rabbitmq_worker.py
-    environment:
-      - RABBITMQ_HOST=rabbitmq
-      - RABBITMQ_PORT=5672
-      - RABBITMQ_USER=admin
-      - RABBITMQ_PASS=adminpassword
-      - RABBITMQ_VHOST=/
-
-  auth_room_event_worker:
-    build:
-      context: ./auth_service
-    container_name: auth_room_event_worker
-    restart: always
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    volumes:
-      - ./auth_service:/app
-    command: python accounts/room_event_worker.py
-    environment:
-      - RABBITMQ_HOST=rabbitmq
-      - RABBITMQ_PORT=5672
-      - RABBITMQ_USER=admin
-      - RABBITMQ_PASS=adminpassword
-      - RABBITMQ_VHOST=/
   room_service:
     build:
       context: ./room_service
-      args:
-        - BUILD_DNS=8.8.8.8
     container_name: room_service
     restart: always
     depends_on:
@@ -83,10 +43,8 @@ services:
       - "8001"
     volumes:
       - ./room_service:/app
-    command: python manage.py runserver 0.0.0.0:8001 --noreload
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
+    command: >
+      sh -c "python manage.py runserver 0.0.0.0:8001 --noreload"
     environment:
       - DATABASE_URL=postgresql://confero_user:confero_pass@confero_db:5432/confero_db
       - RABBITMQ_HOST=rabbitmq
@@ -94,6 +52,7 @@ services:
       - RABBITMQ_USER=admin
       - RABBITMQ_PASS=adminpassword
       - RABBITMQ_VHOST=/
+      - JWT_SIGNING_KEY=your-shared-jwt-signing-key-here
 
   confero_db:
     image: postgres:15
@@ -123,27 +82,13 @@ services:
     environment:
       - RABBITMQ_DEFAULT_USER=admin
       - RABBITMQ_DEFAULT_PASS=adminpassword
+      - RABBITMQ_DEFAULT_VHOST=/
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: ["CMD", "rabbitmqctl", "status"]
       interval: 15s
       timeout: 20s
-      retries: 5
-      start_period: 90s
-
-  redis:
-    image: redis:latest
-    container_name: redis
-    restart: always
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
       retries: 5
 
   notification_service:
@@ -152,25 +97,25 @@ services:
     container_name: notification_service
     restart: always
     depends_on:
-      rabbitmq:
+      confero_db:
         condition: service_healthy
-      redis:
+      rabbitmq:
         condition: service_healthy
     ports:
       - "8003:8003"
     volumes:
       - ./notification_service:/app
-    command: daphne -b 0.0.0.0 -p 8003 notification_service.asgi:application  # Use daphne instead of runserver
+    command: >
+      sh -c "python manage.py runserver 0.0.0.0:8003 & python notifications/rabbitmq_consumer.py"
     environment:
+      - DATABASE_URL=postgresql://confero_user:confero_pass@confero_db:5432/confero_db
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
       - RABBITMQ_USER=admin
       - RABBITMQ_PASS=adminpassword
       - RABBITMQ_VHOST=/
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      - JWT_SIGNING_KEY=your-shared-jwt-signing-key-here
 
 volumes:
   postgres_data:
   rabbitmq_data:
-  redis_data:
