@@ -247,10 +247,27 @@ class FetchAllProflieView(APIView):
         return Response(serializer.data,status=status.HTTP_200_OK)
 
 #--------------------------------------------------------------------------------
+
+class UserDetailView(APIView):
+    def get(self, request, id, *args, **kwargs):
+        try:
+            print("\n=== Request Headers ===")
+            for header, value in request.META.items():
+                if header.startswith('HTTP_'):
+                    print(f"{header[5:]}: {value}")
+            user = CustomUser.objects.get(id=id)
+            serializer = UserSerializer(user)
+            return Response(serializer.data,status=status.HTTP_200_OK)
+        except CustomUser.DoesNotExist:
+            return Response(
+                {"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+
+#--------------------------------------------------------------------------------
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 class ValidateTokenView(APIView):
-    permission_classes = [AllowAny]
     def post(self, request):
         token = request.data.get('token')
         if not token:

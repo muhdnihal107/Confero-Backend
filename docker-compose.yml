@@ -16,6 +16,8 @@ services:
       - "8000:8000"
     volumes:
       - ./auth_service:/app
+    networks:
+      - confero_network
     command: >
       sh -c "python manage.py runserver 0.0.0.0:8000"
     environment:
@@ -43,6 +45,8 @@ services:
       - "8001"
     volumes:
       - ./room_service:/app
+    networks:
+      - confero_network
     command: >
       sh -c "python manage.py runserver 0.0.0.0:8001 --noreload"
     environment:
@@ -66,6 +70,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - confero_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U confero_user -d confero_db"]
       interval: 5s
@@ -85,6 +91,8 @@ services:
       - RABBITMQ_DEFAULT_VHOST=/
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - confero_network
     healthcheck:
       test: ["CMD", "rabbitmqctl", "status"]
       interval: 15s
@@ -101,12 +109,16 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      auth_service:
+        condition: service_started
     ports:
       - "8003:8003"
     volumes:
       - ./notification_service:/app
+    networks:
+      - confero_network
     command: >
-      sh -c "python manage.py runserver 0.0.0.0:8003 & python notifications/rabbitmq_consumer.py"
+      sh -c "sleep 5 && python manage.py runserver 0.0.0.0:8003 & python notifications/rabbitmq_consumer.py"
     environment:
       - DATABASE_URL=postgresql://confero_user:confero_pass@confero_db:5432/confero_db
       - RABBITMQ_HOST=rabbitmq
@@ -115,7 +127,13 @@ services:
       - RABBITMQ_PASS=adminpassword
       - RABBITMQ_VHOST=/
       - JWT_SIGNING_KEY=your-shared-jwt-signing-key-here
+      - AUTH_SERVICE_URL=http://auth_service:8000/api/
+
 
 volumes:
   postgres_data:
   rabbitmq_data:
+
+networks:
+  confero_network:
+    driver: bridge

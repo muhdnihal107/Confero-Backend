@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-h1(%awi-^geh@26o^p6ey+!eu0s&hqz!jf#8q%iic(q9ab6%tb
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = []
 
 
 # Application definition
@@ -38,13 +38,16 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'rest_framework_simplejwt',
-    'notifications',  # Your app
+    # 'rest_framework_simplejwt',
+    'notifications',
+    'corsheaders',
+  # Your app
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -93,20 +96,13 @@ DATABASES = {
 }
 
 
-# Configure channel layer with Redis
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ],
-
-}
-
-
-
-
 
 WSGI_APPLICATION = 'notification_service.wsgi.application'
 
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:8000",
+]
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
@@ -159,10 +155,23 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 from datetime import timedelta
 
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'notifications.authentication.CustomJWTAuthentication',
+    ],
+}
+
+
+import os
+
+AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth_service:8000/api/")
+
+
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=2),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'SIGNING_KEY': 'your-shared-jwt-signing-key-here',  # Must match auth_service
+    'SIGNING_KEY': 'your-shared-jwt-signing-key-here',  
+    "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
 RABBITMQ = {

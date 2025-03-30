@@ -24,8 +24,8 @@ SECRET_KEY = 'django-insecure-+a0^n%s1nc84lwdl0&ms#=tyt3jb8=t$16)(%+=hie2g81_vdt
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
+ALLOWED_HOSTS = ['*']
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'auth_service']
 
 
 # Application definition
@@ -150,6 +150,13 @@ AUTH_USER_MODEL = 'accounts.CustomUser'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'  # BASE_DIR is already defined
 
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:8001",
+    "http://localhost:8003",
+    "http://auth_service:8000",  # Add this to allow Docker service
+    "http://notification_service:8000",  
+]
 from datetime import timedelta
 import os
 # auth_service/settings.py
@@ -157,30 +164,26 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',  # Use the custom permission
-    ],
 }
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=2),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
     'SIGNING_KEY': os.getenv('JWT_SIGNING_KEY', 'your-shared-jwt-signing-key-here'),
-    'USER_ID_FIELD': 'id',
-    'USER_ID_CLAIM': 'user_id',
+    "AUTH_HEADER_TYPES": ("Bearer",),
+
 }
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  
-]
 
 CORS_ALLOW_CREDENTIALS = True
 
 SITE_ID = 1
 
-AUTHENTICATION_BACKENDS = [
-    'django.contrib.auth.backends.ModelBackend',
-    'allauth.account.auth_backends.AuthenticationBackend',
-]
+# AUTHENTICATION_BACKENDS = [
+#     'django.contrib.auth.backends.ModelBackend',
+#     'allauth.account.auth_backends.AuthenticationBackend',
+# ]
 
 GOOGLE_CLIENT_ID = '1092656538511-9g9vtc7715g4gsm088tjjiac7ksu9ita.apps.googleusercontent.com'  # Replace with your Google Client ID
 

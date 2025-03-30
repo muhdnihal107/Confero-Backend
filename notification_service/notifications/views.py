@@ -9,8 +9,10 @@ from rest_framework.decorators import api_view,permission_classes
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 class NotificationListView(APIView):
-    def get(self, request,pk):
-        notifications = Notification.objects.filter(user_id=pk)
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        notifications = Notification.objects.filter(user_id=request.user.id)
         serializer = NotificationSerializer(notifications, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
