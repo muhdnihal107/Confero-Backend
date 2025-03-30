@@ -17,7 +17,7 @@ import os
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = '__all__'
+        fields = ['id', 'username', 'email', 'is_verified']
 
 
 
@@ -53,9 +53,11 @@ class LoginSerializer(serializers.Serializer):
 class ProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', required=False)  # Allow updating username
     email = serializers.EmailField(source='user.email', read_only=True)
+    user_id = serializers.IntegerField(source='user.id', read_only=True)  # Add this line
+
     class Meta:
         model = Profile
-        fields = ['username','email','phone_number', 'bio', 'profile_photo']
+        fields = ['user_id','username','email','phone_number', 'bio', 'profile_photo']
         
         def update(self, instance, validated_data):
             user_data = validated_data.pop('user', {})
