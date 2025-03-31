@@ -241,8 +241,9 @@ def google_login(request):
 
 #-----------------------------------------------------------------------------------------------
 class FetchAllProflieView(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self,request):
-        profiles = Profile.objects.all()
+        profiles = Profile.objects.exclude(user=request.user)  # Exclude the current user's profile
         serializer = ProfileSerializer(profiles,many=True)
         return Response(serializer.data,status=status.HTTP_200_OK)
 
@@ -401,5 +402,17 @@ class FriendRequestActionView(APIView):
                 return Response({"error": "Invalid action"}, status=status.HTTP_400_BAD_REQUEST)
         except FriendRequest.DoesNotExist:
             return Response({"error": "Friend request not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+#-------------------------------------------------------------------------------------------------- 
+
+
+class FetchFriendsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        friends = Friendship.objects.filter(user=request.user).select_related("friend__profile")
+        friend_profiles = [friend.friend.profile for friend in friends if hasattr(friend.friend, "profile")]
+        serializer = ProfileSerializer(friend_profiles, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
  
