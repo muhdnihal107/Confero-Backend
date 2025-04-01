@@ -1,11 +1,15 @@
-from django.shortcuts import render
+from django.shortcuts import render,get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from .models import Room
-from .serializers import RoomSerializer, PublicRoomSerializer
+from .serializers import RoomSerializer, PublicRoomSerializer,RoomUpdateSerializer
 import requests
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class RoomView(APIView):
     permission_classes = [IsAuthenticated]
@@ -19,26 +23,42 @@ class RoomView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):
-        user_email = request.user.email
-        user_id = request.user.id
-
-        serializer = RoomSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(creator_id=user_id, creator_email=user_email)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def put(self, request, slug):
-        user_id = request.user.id
         try:
-            room = Room.objects.get(slug=slug, creator_id=user_id)
-            serializer = RoomSerializer(room, data=request.data, partial=True)
+            if not request.user.is_authenticated:
+                return Response({"error": "User not authenticated"}, status=status.HTTP_401_UNAUTHORIZED)
+            
+
+            data = request.data.copy()
+            data['creator_id'] = request.user.id
+            
+            serializer = RoomSerializer(data=data)
             if serializer.is_valid():
                 serializer.save()
-                return Response(serializer.data, status=status.HTTP_200_OK)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except Room.DoesNotExist:
-            return Response({"error": "Room not found or you are not the creator"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class RoomUpdateAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request, room_id):
+        room = get_object_or_404(Room, id=room_id)
+
+        if room.creator_id != request.user.id:
+            return Response(
+                {"error": "You do not have permission to update this room."}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = RoomUpdateSerializer(room, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "Room updated successfully", "room": serializer.data})
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 
 class PublicRoomsView(APIView):
     def get(self, request):
@@ -47,35 +67,37 @@ class PublicRoomsView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-from utils.rabbitmq import RabbitMQClient
+# from utils.rabbitmq import RabbitMQClient
 
-class JoinRoomView(APIView):
-    permission_classes = [IsAuthenticated]
+# class JoinRoomView(APIView):
+#     permission_classes = [IsAuthenticated]
 
-    def post(self, request, slug):
-        user_email = request.user.email
-        try:
-            room = Room.objects.get(slug=slug)
-            if room.visibility == 'public' or user_email in room.invited_users or user_email == room.creator_email:
-                if user_email not in room.participants:
-                    room.participants.append(user_email)
-                    room.save()
+#     def post(self, request, slug):
+#         user_email = request.user.email
+#         try:
+#             room = Room.objects.get(slug=slug)
+#             if room.visibility == 'public' or user_email in room.invited_users or user_email == room.creator_email:
+#                 if user_email not in room.participants:
+#                     room.participants.append(user_email)
+#                     room.save()
 
-                    # Publish a message to RabbitMQ
-                    rabbitmq_client = RabbitMQClient()
-                    rabbitmq_client.connect()
-                    rabbitmq_client.publish_message(
-                        queue_name='room_events',
-                        message={
-                            'event': 'user_joined',
-                            'room_id': room.id,
-                            'room_name': room.name,
-                            'user_email': user_email
-                        }
-                    )
-                    rabbitmq_client.close()
+#                     # Publish a message to RabbitMQ
+#                     rabbitmq_client = RabbitMQClient()
+#                     rabbitmq_client.connect()
+#                     rabbitmq_client.publish_message(
+#                         queue_name='room_events',
+#                         message={
+#                             'event': 'user_joined',
+#                             'room_id': room.id,
+#                             'room_name': room.name,
+#                             'user_email': user_email
+#                         }
+#                     )
+#                     rabbitmq_client.close()
 
-                return Response({"message": "Joined room successfully"}, status=status.HTTP_200_OK)
-            return Response({"error": "You are not authorized to join this room"}, status=status.HTTP_403_FORBIDDEN)
-        except Room.DoesNotExist:
-            return Response({"error": "Room not found"}, status=status.HTTP_404_NOT_FOUND)
+#                 return Response({"message": "Joined room successfully"}, status=status.HTTP_200_OK)
+#             return Response({"error": "You are not authorized to join this room"}, status=status.HTTP_403_FORBIDDEN)
+#         except Room.DoesNotExist:
+#             return Response({"error": "Room not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+

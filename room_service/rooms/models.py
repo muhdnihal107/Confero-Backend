@@ -8,7 +8,7 @@ class Room(models.Model):
     ]
 
     creator_id = models.IntegerField()  
-    creator_email = models.EmailField()  
+    creator_email = models.EmailField(blank=True)  
     name = models.CharField(max_length=100)
     slug = models.SlugField(max_length=120, unique=True, blank=True)
     description = models.TextField(blank=True, null=True)

@@ -47,3 +47,12 @@ class NotificationAllView(APIView):
 @permission_classes([IsAuthenticated])
 def test_auth(request):
     return Response({"message": f"Authenticated as {request.user.email}"})
+
+class ClearNotifications(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request):
+        user_id = request.user.id
+        notifications = Notification.objects.filter(user_id=user_id)
+        notifications.delete()
+        return Response({"detail": "All notifications cleared."},status=status.HTTP_204_NO_CONTENT)

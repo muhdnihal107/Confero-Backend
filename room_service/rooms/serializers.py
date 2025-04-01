@@ -2,18 +2,35 @@ from rest_framework import serializers
 from .models import Room,RoomInvite
 
 class RoomSerializer(serializers.ModelSerializer):
-    invited_users = serializers.ListField(child=serializers.EmailField(), required=False)
-    thumbnail = serializers.ImageField(required=False)
     class Meta:
         model = Room
-        fields = ['id', 'name', 'slug', 'description', 'visibility', 'creator_id', 'creator_email', 'invited_users', 'thumbnail', 'participants', 'created_at', 'updated_at']
-        read_only_fields = ['slug', 'creator_id', 'creator_email', 'created_at', 'updated_at']
+        fields = ['id', 'creator_id', 'creator_email', 'name', 'slug', 'description', 
+                 'visibility', 'invited_users', 'thumbnail', 'participants', 
+                 'created_at', 'updated_at']
+        read_only_fields = ['id', 'slug', 'created_at', 'updated_at']
+
+    # def validate(self, data):
+    #     """
+    #     Add any custom validation if needed
+    #     """
+    #     return data
+    
+class RoomUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Room
+        fields = ["name", "description", "visibility", "invited_users", "thumbnail"]
+
+    def validate_name(self, value):
+        room_id = self.instance.id if self.instance else None
+        if Room.objects.exclude(id=room_id).filter(name=value).exists():
+            raise serializers.ValidationError("A room with this name already exists.")
+        return value
 
 class PublicRoomSerializer(serializers.ModelSerializer):
     class Meta:
         model = Room
         fields = ['id', 'name', 'slug', 'description', 'creator_email', 'thumbnail', 'participants', 'created_at']
-        read_only_fields = ['id', 'slug', 'creator_email', 'created_at']
+        read_only_fields = ['id', 'slug', 'created_at']
         
 class RoomInviteSerializer(serializers.ModelSerializer):
     invitee_id = serializers.IntegerField()
