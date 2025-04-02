@@ -51,9 +51,9 @@ class LoginSerializer(serializers.Serializer):
 
 #--------------------------------------------------------------------------------
 class ProfileSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(source='user.username', required=False)  # Allow updating username
+    username = serializers.CharField(source='user.username', required=False)  
     email = serializers.EmailField(source='user.email', read_only=True)
-    user_id = serializers.IntegerField(source='user.id', read_only=True)  # Add this line
+    user_id = serializers.IntegerField(source='user.id', read_only=True)  
 
     class Meta:
         model = Profile

@@ -44,7 +44,7 @@ def process_message(ch, method, properties, body):
 
 def start_rabbitmq_consumer():
     max_retries = 10
-    retry_delay = 5  # seconds
+    retry_delay = 5  
     attempt = 0
 
     while attempt < max_retries:
@@ -67,7 +67,7 @@ def start_rabbitmq_consumer():
 
             print("✅ Auth Service: Waiting for messages...")
             channel.start_consuming()
-            break  # Exit loop if successful
+            break  
         except pika.exceptions.AMQPConnectionError as e:
             attempt += 1
             print(f"Failed to connect to RabbitMQ (attempt {attempt}/{max_retries}): {e}")

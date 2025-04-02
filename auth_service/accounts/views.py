@@ -339,7 +339,6 @@ class FriendRequestView(APIView):
 #-------------------------------------------------------------------------------------------------- 
 import os
 import pika
-# In views.py
 class FriendRequestActionView(APIView):
     permission_classes = [IsAuthenticated]
     
@@ -376,7 +375,7 @@ class FriendRequestActionView(APIView):
     def post(self, request, request_id):
         try:
             friend_request = FriendRequest.objects.get(id=request_id)
-            action = request.data.get('action')  # Fix: Use .get() to safely access 'action'
+            action = request.data.get('action')  
             
             if action == 'accept':
                 friend_request.status = 'accepted'
@@ -385,7 +384,6 @@ class FriendRequestActionView(APIView):
                 Friendship.objects.create(user=friend_request.sender, friend=friend_request.receiver)
                 Friendship.objects.create(user=friend_request.receiver, friend=friend_request.sender)
                 
-                # Send notification to sender
                 self.send_notification(friend_request.sender.id, friend_request.receiver.id, "accepted")                 
                 
                 return Response({"message": "Friend request accepted"}, status=status.HTTP_200_OK)
@@ -394,7 +392,6 @@ class FriendRequestActionView(APIView):
                 friend_request.status = 'rejected'
                 friend_request.save()
                 
-                # Send notification to sender (optional)
                 self.send_notification(friend_request.sender.id, friend_request.receiver.id, "rejected")
                 return Response({"message": "Friend request rejected"}, status=status.HTTP_200_OK)
             

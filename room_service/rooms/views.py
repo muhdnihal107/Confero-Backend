@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from .models import Room
-from .serializers import RoomSerializer, PublicRoomSerializer,RoomUpdateSerializer
+from .serializers import RoomSerializer,RoomUpdateSerializer
 import requests
 import logging
 
@@ -62,9 +62,18 @@ class RoomUpdateAPIView(APIView):
 
 class PublicRoomsView(APIView):
     def get(self, request):
-        public_rooms = Room.objects.filter(visibility='public')
-        serializer = PublicRoomSerializer(public_rooms, many=True)
+        public_rooms = Room.objects.all()
+        serializer = RoomSerializer(public_rooms, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class DeleteRoom(APIView):
+    def delete(self,request):
+        id = request.data["id"]
+        room=Room.objects.filter(id=id)
+
+        room.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 
 # from utils.rabbitmq import RabbitMQClient

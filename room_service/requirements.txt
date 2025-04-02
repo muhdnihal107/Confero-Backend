@@ -7,6 +7,7 @@ django-cors-headers>=4.7.0,<4.8
 # Database
 psycopg2-binary>=2.9.10,<2.10
 
+PyJWT==2.8.0
 # HTTP Requests (for calling Auth Service)
 requests>=2.32.3,<2.33
 
@@ -19,3 +20,12 @@ sqlparse>=0.5.3,<0.6
 tzdata>=2025.1,<2026.0  # Optional, only if on Windows
 
 pika>=1.3.2,<1.4
+
+
+
+python-decouple==3.8  # For environment variable management (optional)
+# WebSocket and Real-time Features
+channels==4.0.0  # Django Channels for WebSocket support
+daphne==4.0.0  # ASGI server for Channels
+channels-redis==4.2.0  # Redis backend for Channels
+redis==5.0.3  # Redis client for Python

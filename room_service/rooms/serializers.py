@@ -8,12 +8,19 @@ class RoomSerializer(serializers.ModelSerializer):
                  'visibility', 'invited_users', 'thumbnail', 'participants', 
                  'created_at', 'updated_at']
         read_only_fields = ['id', 'slug', 'created_at', 'updated_at']
+    def validate_thumbnail(self, value):
+        # Example: Limit file size to 5MB
+        if value.size > 5 * 1024 * 1024:  # 5MB in bytes
+            raise serializers.ValidationError("Thumbnail file size must be less than 5MB.")
+        # Check file type (optional)
+        if not value.content_type in ['image/jpeg', 'image/png']:
+            raise serializers.ValidationError("Only JPEG and PNG images are allowed.")
+        return value
 
-    # def validate(self, data):
-    #     """
-    #     Add any custom validation if needed
-    #     """
-    #     return data
+    def validate(self, value):
+        if Room.objects.filter(name=value).exists():
+            raise serializers.ValidationError("A room with this name already exists.")
+        return value
     
 class RoomUpdateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -26,11 +33,6 @@ class RoomUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("A room with this name already exists.")
         return value
 
-class PublicRoomSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Room
-        fields = ['id', 'name', 'slug', 'description', 'creator_email', 'thumbnail', 'participants', 'created_at']
-        read_only_fields = ['id', 'slug', 'created_at']
         
 class RoomInviteSerializer(serializers.ModelSerializer):
     invitee_id = serializers.IntegerField()

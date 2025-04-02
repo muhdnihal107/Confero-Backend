@@ -10,7 +10,7 @@ psycopg2-binary>=2.9.10,<2.10
 #django-allauth==0.58.2  # Replace with the latest version if needed
 # Image Handling (for profile_picture)
 Pillow>=11.1.0,<11.2
-
+PyJWT==2.8.0
 # Social Authentication
 # social-auth-app-django>=5.4.2,<5.5
 # Django Dependencies

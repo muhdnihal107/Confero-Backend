@@ -9,7 +9,7 @@ class Room(models.Model):
 
     creator_id = models.IntegerField()  
     creator_email = models.EmailField(blank=True)  
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100,unique=True)
     slug = models.SlugField(max_length=120, unique=True, blank=True)
     description = models.TextField(blank=True, null=True)
     visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default='public')
@@ -18,7 +18,7 @@ class Room(models.Model):
     participants = models.JSONField(default=list)  
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    session_id = models.CharField(max_length=100, blank=True, null=True)  # For video call session
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(self.name)
