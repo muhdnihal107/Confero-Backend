@@ -2,6 +2,6 @@
 FROM python:3.11-slim
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt daphne
 COPY . .
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8003"]
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8003", "notification_service.asgi:application"]

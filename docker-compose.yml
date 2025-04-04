@@ -2,6 +2,21 @@
 version: '3.8'
 
 services:
+  redis:
+    image: redis:7
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - confero_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
   auth_service:
     build:
       context: ./auth_service
@@ -60,6 +75,8 @@ services:
       - RABBITMQ_VHOST=/
       - JWT_SIGNING_KEY=your-shared-jwt-signing-key-here
       - AUTH_SERVICE_URL=http://auth_service:8000/api/
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
   confero_db:
     image: postgres:15
     container_name: confero_db
@@ -113,6 +130,8 @@ services:
         condition: service_healthy
       auth_service:
         condition: service_started
+      redis:
+        condition: service_healthy
     ports:
       - "8003:8003"
     volumes:
@@ -120,7 +139,7 @@ services:
     networks:
       - confero_network
     command: >
-      sh -c "sleep 5 && python manage.py runserver 0.0.0.0:8003 & python notifications/rabbitmq_consumer.py"
+      sh -c "daphne -b 0.0.0.0 -p 8003 notification_service.asgi:application & python notifications/rabbitmq_consumer.py"
     environment:
       - DATABASE_URL=postgresql://confero_user:confero_pass@confero_db:5432/confero_db
       - RABBITMQ_HOST=rabbitmq
@@ -135,6 +154,7 @@ services:
 volumes:
   postgres_data:
   rabbitmq_data:
+  redis_data:
 
 networks:
   confero_network:

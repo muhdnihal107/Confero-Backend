@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     # 'rest_framework_simplejwt',
     'notifications',
     'corsheaders',
+    'channels',
   # Your app
 ]
 
@@ -57,16 +58,16 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'notification_service.urls'
 
-# ASGI_APPLICATION = 'notification_service.asgi.application'
+ASGI_APPLICATION = 'notification_service.asgi.application'
 
-# CHANNEL_LAYERS = {
-#     "default": {
-#         "BACKEND": "channels_redis.core.RedisChannelLayer",
-#         "CONFIG": {
-#             "hosts": [(os.getenv("REDIS_HOST", "redis"), int(os.getenv("REDIS_PORT", 6379)))],
-#         },
-#     },
-# }
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [('redis', 6379)],
+        },
+    },
+}
 
 TEMPLATES = [
     {
@@ -170,7 +171,7 @@ AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth_service:8000/api/"
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=2),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'SIGNING_KEY': 'your-shared-jwt-signing-key-here',  
+    'SIGNING_KEY': os.getenv('JWT_SIGNING_KEY', 'your-shared-jwt-signing-key-here'),  
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
