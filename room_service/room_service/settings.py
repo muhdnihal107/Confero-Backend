@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-8o6%sv#h8*p&#(&mfk2d)a9v=!yeg*4*1@69fpj36_t+oe)+7#
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
@@ -57,6 +57,17 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'room_service.urls'
 
+ASGI_APPLICATION = 'room_service.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [('redis', 6379)],  # Add Redis service to docker-compose later
+        },
+    },
+}
+
 CORS_ALLOW_ALL_ORIGINS = True  # For development; restrict in production
 
 TEMPLATES = [
@@ -76,16 +87,7 @@ TEMPLATES = [
 ]
 
 
-ASGI_APPLICATION = 'room_service.asgi.application'
 
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            'hosts': [('redis', 6379)],  # Add Redis service to docker-compose later
-        },
-    },
-}
 
 
 WSGI_APPLICATION = 'room_service.wsgi.application'
@@ -170,7 +172,7 @@ AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth_service:8000/api/"
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=2),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'SIGNING_KEY': 'your-shared-jwt-signing-key-here',  
+    'SIGNING_KEY': os.getenv('JWT_SIGNING_KEY', 'your-shared-jwt-signing-key-here'),  
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
@@ -197,4 +199,11 @@ LOGGING = {
         },
     },
 }
+
+# WebRTC ICE servers
+ICE_SERVERS = [
+    {'urls': 'stun:stun.l.google.com:19302'},  # Public STUN server
+    # Add TURN server if needed (e.g., from a provider like Twilio)
+    # {'urls': 'turn:your-turn-server.com:3478', 'username': 'user', 'credential': 'pass'},
+]
 

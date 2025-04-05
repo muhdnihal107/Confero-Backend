@@ -27,5 +27,4 @@ python-decouple==3.8  # For environment variable management (optional)
 # WebSocket and Real-time Features
 channels==4.0.0  # Django Channels for WebSocket support
 daphne==4.0.0  # ASGI server for Channels
-channels-redis==4.2.0  # Redis backend for Channels
-redis==5.0.3  # Redis client for Python
+channels-redis==4.0.0  # Redis backend for Channels

@@ -56,17 +56,18 @@ services:
         condition: service_healthy
       auth_service:
         condition: service_started
+      redis:
+        condition: service_healthy
     ports:
       - "8001:8001"
-    expose:
-      - "8001"
     volumes:
       - ./room_service:/app
     networks:
       - confero_network
     command: >
-      sh -c "sleep 5 && python manage.py runserver 0.0.0.0:8001"
+      sh -c "daphne -b 0.0.0.0 -p 8001 room_service.asgi:application & python rooms/rabbitmq_consumer.py & wait"
     environment:
+      - DJANGO_SETTINGS_MODULE=room_service.settings
       - DATABASE_URL=postgresql://confero_user:confero_pass@confero_db:5432/confero_db
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
@@ -77,6 +78,11 @@ services:
       - AUTH_SERVICE_URL=http://auth_service:8000/api/
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
   confero_db:
     image: postgres:15
     container_name: confero_db
@@ -149,6 +155,8 @@ services:
       - RABBITMQ_VHOST=/
       - JWT_SIGNING_KEY=your-shared-jwt-signing-key-here
       - AUTH_SERVICE_URL=http://auth_service:8000/api/
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8003"]
       interval: 10s

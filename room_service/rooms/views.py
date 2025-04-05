@@ -76,6 +76,11 @@ class DeleteRoom(APIView):
 
 
 
+class HealthCheckView(APIView):
+    def get(self, request):
+        return Response({"status": "ok"}, status=200)
+
+
 # from utils.rabbitmq import RabbitMQClient
 
 # class JoinRoomView(APIView):

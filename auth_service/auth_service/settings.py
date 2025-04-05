@@ -155,7 +155,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:8001",
     "http://localhost:8003",
     "http://auth_service:8000",  # Add this to allow Docker service
-    "http://notification_service:8000",  
+    "http://notification_service:8000",
+    "http://room_service:8000", 
 ]
 from datetime import timedelta
 import os

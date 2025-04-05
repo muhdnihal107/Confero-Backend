@@ -1,23 +1,17 @@
-"""
-ASGI config for room_service project.
-
-It exposes the ASGI callable as a module-level variable named ``application``.
-
-For more information on this file, see
-https://docs.djangoproject.com/en/5.1/howto/deployment/asgi/
-"""
-
+# room_service/asgi.py
 import os
-from django.core.asgi import get_asgi_application
-from channels.routing import ProtocolTypeRouter, URLRouter
-from channels.auth import AuthMiddlewareStack
-import rooms.routing
+import django
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'room_service.settings')
+django.setup()
+from django.core.asgi import get_asgi_application
+from channels.routing import ProtocolTypeRouter, URLRouter
+from rooms.middleware import JWTAuthMiddleware
+import rooms.routing
 
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),
-    "websocket": AuthMiddlewareStack(
+    "websocket": JWTAuthMiddleware(
         URLRouter(
             rooms.routing.websocket_urlpatterns
         )

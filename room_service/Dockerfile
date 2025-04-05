@@ -4,8 +4,8 @@ WORKDIR /app
 
 
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt daphne
 
 COPY . .
 
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8001"]
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8001", "room_service.asgi:application"]
