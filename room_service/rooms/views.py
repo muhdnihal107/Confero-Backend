@@ -7,6 +7,9 @@ from .models import Room
 from .serializers import RoomSerializer,RoomUpdateSerializer
 import requests
 import logging
+import pika
+import os
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -58,14 +61,226 @@ class RoomUpdateAPIView(APIView):
             return Response({"message": "Room updated successfully", "room": serializer.data})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+#---------------------------------------------------------------------------------------------
+class RoomDetails(APIView):
+    permission_classes = [IsAuthenticated]
 
+    def get(self,request,room_id):
+        room= get_object_or_404(Room,id=room_id)
+        serializer = RoomSerializer(room)
+        return Response(serializer.data,status=status.HTTP_200_OK) 
+
+
+#---------------------------------------------------------------------------------------------
 
 class PublicRoomsView(APIView):
     def get(self, request):
         public_rooms = Room.objects.all()
         serializer = RoomSerializer(public_rooms, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+#----------------------------------------------------------------------------------------------- 
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+class InviteFriendView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, room_id):
+        room = get_object_or_404(Room, id=room_id)
+        sender = request.user
+
+        if room.creator_id != sender.id:
+            return Response({"error": "Only the room creator can invite friends"}, 
+                          status=status.HTTP_403_FORBIDDEN)
+
+        receiver_id = request.data.get("receiver_id")
+        friend_email = request.data.get("email")  # Expect email from frontend
+
+        if not receiver_id or not friend_email:
+            return Response({"error": "Both receiver_id and email are required"}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if already invited
+        if receiver_id in room.invited_users:
+            return Response({"error": "Friend already invited to this room"}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+
+        # Add friend to invited_users
+        room.invited_users.append(receiver_id)
+        room.save()
+
+        # Send notification
+        self.send_notification(room, receiver_id, sender)
+
+        return Response({"message": f"Invited user {friend_email} to room {room.name}!"}, 
+                      status=status.HTTP_200_OK)
+
+    def send_notification(self, room, receiver_id, sender):
+        try:
+            credentials = pika.PlainCredentials(
+                os.getenv('RABBITMQ_USER', 'admin'),
+                os.getenv('RABBITMQ_PASS', 'adminpassword')
+            )
+            connection = pika.BlockingConnection(
+                pika.ConnectionParameters(
+                    host=os.getenv('RABBITMQ_HOST', 'rabbitmq'),
+                    port=int(os.getenv('RABBITMQ_PORT', 5672)),
+                    credentials=credentials
+                )
+            )
+            channel = connection.channel()
+            channel.queue_declare(queue="notification_queue", durable=True)
+
+            notification_data = {
+                "receiver_id": str(receiver_id),
+                "message": f"{sender.email} invited you to join room '{room.name}'.",
+                "type": "room_invite",
+                "friend_request_id": str(room.id),  # Using this field for room_id
+            }
+
+            channel.basic_publish(
+                exchange="",
+                routing_key="notification_queue",
+                body=json.dumps(notification_data),
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+            logger.info(f"Notification sent for user {receiver_id} to join room {room.id}")
+            connection.close()
+
+        except Exception as e:
+            logger.error(f"Error sending notification: {e}")
+#--------------------------------------------------------------------------------------------------
+class AcceptRoomInviteView(APIView):
+    permission_classes =[IsAuthenticated]
+
+    def post(self, request, room_id):
+        room = get_object_or_404(Room, id=room_id)
+        user = request.user
+
+        # Check if user was invited
+        if user.id not in room.invited_users:
+            return Response({"error": f"{user.id} were not invited to this room"}, 
+                          status=status.HTTP_403_FORBIDDEN)
+
+        # Add user to participants (if not already there)
+        if str(user.id) not in room.participants:  # Convert to string for JSONField consistency
+            room.participants.append(str(user.id))
+        
+        # Remove user from invited_users
+        room.invited_users.remove(user.id)
+        room.save()
+
+        # Send notification to creator
+        self.send_acceptance_notification(room, user)
+
+        return Response({"message": f"Joined room {room.name} successfully!"}, 
+                      status=status.HTTP_200_OK)
     
+    def send_acceptance_notification(self, room, user):
+        try:
+            credentials = pika.PlainCredentials(
+                os.getenv('RABBITMQ_USER', 'admin'),
+                os.getenv('RABBITMQ_PASS', 'adminpassword')
+            )
+            connection = pika.BlockingConnection(
+                pika.ConnectionParameters(
+                    host=os.getenv('RABBITMQ_HOST', 'rabbitmq'),
+                    port=int(os.getenv('RABBITMQ_PORT', 5672)),
+                    credentials=credentials
+                )
+            )
+            channel = connection.channel()
+            channel.queue_declare(queue="notification_queue", durable=True)
+
+            notification_data = {
+                "receiver_id": str(room.creator_id),  # Notify the creator
+                "message": f"{user.email} has joined your room '{room.name}'.",
+                "type": "room_invite_accepted",
+                "friend_request_id": str(room.id),  # Room ID for reference
+            }
+
+            channel.basic_publish(
+                exchange="",
+                routing_key="notification_queue",
+                body=json.dumps(notification_data),
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+            logger.info(f"Notification sent to creator {room.creator_id} for room {room.id}")
+            connection.close()
+
+        except Exception as e:
+            logger.error(f"Error sending acceptance notification: {e}")
+
+
+#--------------------------------------------------------------------------------------------------
+
+
+class JoinPublicRoomView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, room_id):
+        room = get_object_or_404(Room, id=room_id)
+        user = request.user
+
+        # Check if the room is public
+        if room.visibility != 'public':
+            return Response({"error": "This room is private. You need an invitation to join."}, 
+                          status=status.HTTP_403_FORBIDDEN)
+
+        # Check if user is already a participant
+        if str(user.id) in room.participants:
+            return Response({"error": "You are already a participant in this room."}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+
+        # Add user to participants
+        room.participants.append(str(user.id))
+        room.save()
+
+        # Send notification to creator
+        self.send_join_notification(room, user)
+
+        return Response({"message": f"Successfully joined public room '{room.name}'!"}, 
+                      status=status.HTTP_200_OK)
+
+    def send_join_notification(self, room, user):
+        try:
+            credentials = pika.PlainCredentials(
+                os.getenv('RABBITMQ_USER', 'admin'),
+                os.getenv('RABBITMQ_PASS', 'adminpassword')
+            )
+            connection = pika.BlockingConnection(
+                pika.ConnectionParameters(
+                    host=os.getenv('RABBITMQ_HOST', 'rabbitmq'),
+                    port=int(os.getenv('RABBITMQ_PORT', 5672)),
+                    credentials=credentials
+                )
+            )
+            channel = connection.channel()
+            channel.queue_declare(queue="notification_queue", durable=True)
+
+            notification_data = {
+                "receiver_id": str(room.creator_id),  # Notify the creator
+                "message": f"{user.email} has joined your public room '{room.name}'.",
+                "type": "public_room_joined",
+                "friend_request_id": str(room.id),  # Room ID for reference
+            }
+
+            channel.basic_publish(
+                exchange="",
+                routing_key="notification_queue",
+                body=json.dumps(notification_data),
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+            logger.info(f"Notification sent to creator {room.creator_id} for room {room.id}")
+            connection.close()
+
+        except Exception as e:
+            logger.error(f"Error sending join notification: {e}")
+
+#-----------------------------------------------------------------------------------------------
+
 class DeleteRoom(APIView):
     def delete(self,request):
         id = request.data["id"]
@@ -75,7 +290,7 @@ class DeleteRoom(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-
+#------------------------------------------------------------------------------------------------------
 class HealthCheckView(APIView):
     def get(self, request):
         return Response({"status": "ok"}, status=200)

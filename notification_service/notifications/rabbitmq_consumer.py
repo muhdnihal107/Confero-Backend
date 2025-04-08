@@ -23,7 +23,6 @@ def process_notification(ch, method, properties, body):
         message = data.get("message")
         notification_type = data.get("type")
         friend_request_id = data.get("friend_request_id")
-
         if not all([receiver_id, message, notification_type]):
             raise ValueError("Missing required fields in notification data")
 
@@ -32,7 +31,7 @@ def process_notification(ch, method, properties, body):
             user_id=receiver_id,
             message=message,
             notification_type=notification_type,
-            friend_requestId=friend_request_id
+            friend_requestId=friend_request_id if friend_request_id else None
         )
         print(f"✅ Notification saved for user {receiver_id}")
 

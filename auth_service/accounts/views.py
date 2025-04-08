@@ -301,7 +301,6 @@ class FriendRequestView(APIView):
         return Response({"message": "Friend request sent!"}, status=status.HTTP_201_CREATED)
 
     def send_notification(self, friend_request):
-        """Sends a RabbitMQ message to the notification service"""
         logger.info("test2")
         try:
             credentials = pika.PlainCredentials(
