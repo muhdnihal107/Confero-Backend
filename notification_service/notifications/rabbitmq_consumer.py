@@ -1,4 +1,4 @@
-
+#notitfications/rabbitmq_consumer.py
 import json
 import pika
 import os

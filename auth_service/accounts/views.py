@@ -16,7 +16,8 @@ from django.views.decorators.csrf import csrf_exempt
 from google.oauth2 import id_token 
 from google.auth.transport import requests
 from django.shortcuts import get_object_or_404
-
+import jwt
+from django.conf import settings
 logging.basicConfig(level=logging.DEBUG)
 
 logger = logging.getLogger("django")
@@ -89,9 +90,20 @@ class LoginView(APIView):
             if not user.email_verified:
                 return Response({"error": "Email not verified"}, status=status.HTTP_403_FORBIDDEN)
             refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+            custom_payload = {
+                'user_id': user.id,
+                'email': user.email,
+                'username': user.username,
+                'exp': refresh.access_token.payload['exp'],  # Copy expiration
+                'iat': refresh.access_token.payload['iat'],  # Copy issued at
+                'jti': refresh.access_token.payload['jti'],  # Copy token ID
+                'token_type': 'access'
+            }
+            custom_access_token = jwt.encode(custom_payload, settings.SIMPLE_JWT['SIGNING_KEY'], algorithm='HS256')
             return Response({
                 "refresh_token": str(refresh),
-                "access_token": str(refresh.access_token),
+                "access_token": custom_access_token,
             }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -250,12 +262,10 @@ class FetchAllProflieView(APIView):
 #--------------------------------------------------------------------------------
 
 class UserDetailView(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request, id, *args, **kwargs):
         try:
-            print("\n=== Request Headers ===")
-            for header, value in request.META.items():
-                if header.startswith('HTTP_'):
-                    print(f"{header[5:]}: {value}")
+
             user = CustomUser.objects.get(id=id)
             serializer = UserSerializer(user)
             return Response(serializer.data,status=status.HTTP_200_OK)

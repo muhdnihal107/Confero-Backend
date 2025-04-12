@@ -24,7 +24,7 @@ SECRET_KEY = 'django-insecure-+a0^n%s1nc84lwdl0&ms#=tyt3jb8=t$16)(%+=hie2g81_vdt
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['*','auth_service', 'auth_service:8000']
 
 
 
@@ -152,6 +152,7 @@ MEDIA_ROOT = BASE_DIR / 'media'  # BASE_DIR is already defined
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "http://localhost:8000",
     "http://localhost:8001",
     "http://localhost:8003",
     "http://auth_service:8000",  # Add this to allow Docker service
@@ -168,11 +169,12 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
+    'TOKEN_OBTAIN_SERIALIZER': 'accounts.serializers.CustomTokenObtainPairSerializer',
     'ACCESS_TOKEN_LIFETIME': timedelta(days=2),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
-    'SIGNING_KEY': os.getenv('JWT_SIGNING_KEY', 'your-shared-jwt-signing-key-here'),
+    'SIGNING_KEY': os.getenv('JWT_SIGNING_KEY', 'a-string-secret-at-least-256-bits-long'),
     "AUTH_HEADER_TYPES": ("Bearer",),
 
 }

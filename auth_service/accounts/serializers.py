@@ -6,6 +6,7 @@ import pika
 import json
 from django.conf import settings
 import os
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 #------------------------------------------------------------------------------
 
 
@@ -18,7 +19,14 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = ['id', 'username', 'email', 'is_verified']
-
+#------------------------------------------------------------------------------
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        # Add email and username to the token payload
+        data['email'] = self.user.email
+        data['username'] = self.user.username
+        return data
 
 
 #------------------------------------------------------------------------------

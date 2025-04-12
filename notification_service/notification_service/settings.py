@@ -171,7 +171,7 @@ AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth_service:8000/api/"
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=2),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'SIGNING_KEY': os.getenv('JWT_SIGNING_KEY', 'your-shared-jwt-signing-key-here'),  
+    'SIGNING_KEY': os.getenv('JWT_SIGNING_KEY', 'a-string-secret-at-least-256-bits-long'),  
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 

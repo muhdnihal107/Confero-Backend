@@ -1,4 +1,3 @@
-# rooms/consumers.py
 import json
 import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -6,7 +5,7 @@ from channels.db import database_sync_to_async
 from asgiref.sync import async_to_sync
 from .models import Room
 from django.contrib.auth.models import AnonymousUser
-from .rabbitmq_consumer import publish_to_rabbitmq 
+from .rabbitmq_consumer import publish_to_rabbitmq
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +15,6 @@ class RoomConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.room_id = self.scope['url_route']['kwargs']['room_id']
         self.room_group_name = f"room_{self.room_id}"
-
         user = self.scope.get("user", AnonymousUser())
         if not getattr(user, 'is_authenticated', False):
             logger.warning(f"Unauthenticated connection attempt to room {self.room_id}")
@@ -45,10 +43,13 @@ class RoomConsumer(AsyncWebsocketConsumer):
                     }
                 )
                 async_to_sync(publish_to_rabbitmq)('user_joined', self.room_id, user_email)
+            else:
+                logger.warning(f"No email for user {getattr(user, 'id', 'unknown')} in room {self.room_id}")
         except Exception as e:
             logger.error(f"Error adding participant or publishing event: {str(e)}")
 
     async def disconnect(self, close_code):
+        logger.info(f"WebSocket disconnected: room={self.room_id}, code={close_code}")
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
         user = self.scope.get("user", AnonymousUser())
 
@@ -67,6 +68,8 @@ class RoomConsumer(AsyncWebsocketConsumer):
                     )
                     async_to_sync(publish_to_rabbitmq)('user_left', self.room_id, user_email)
                     logger.info(f"User {user_email} disconnected from room {self.room_id}")
+                else:
+                    logger.warning(f"No email for user {getattr(user, 'id', 'unknown')} during disconnect")
             except Exception as e:
                 logger.error(f"Error removing participant or publishing event: {str(e)}")
 
@@ -74,6 +77,7 @@ class RoomConsumer(AsyncWebsocketConsumer):
         user = self.scope.get("user", AnonymousUser())
         try:
             data = json.loads(text_data)
+            logger.debug(f"Received message in room {self.room_id}: {data}")
             message_type = data.get('type')
             logger.debug(f"Received message type: {message_type} from {getattr(user, 'email', 'unknown')}")
 

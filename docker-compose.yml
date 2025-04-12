@@ -42,7 +42,7 @@ services:
       - RABBITMQ_USER=admin
       - RABBITMQ_PASS=adminpassword
       - RABBITMQ_VHOST=/
-      - JWT_SIGNING_KEY=your-shared-jwt-signing-key-here
+      - JWT_SIGNING_KEY=a-string-secret-at-least-256-bits-long
 
   room_service:
     build:
@@ -74,7 +74,7 @@ services:
       - RABBITMQ_USER=admin
       - RABBITMQ_PASS=adminpassword
       - RABBITMQ_VHOST=/
-      - JWT_SIGNING_KEY=your-shared-jwt-signing-key-here
+      - JWT_SIGNING_KEY=a-string-secret-at-least-256-bits-long
       - AUTH_SERVICE_URL=http://auth_service:8000/api/
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -153,7 +153,7 @@ services:
       - RABBITMQ_USER=admin
       - RABBITMQ_PASS=adminpassword
       - RABBITMQ_VHOST=/
-      - JWT_SIGNING_KEY=your-shared-jwt-signing-key-here
+      - JWT_SIGNING_KEY=a-string-secret-at-least-256-bits-long
       - AUTH_SERVICE_URL=http://auth_service:8000/api/
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -163,6 +163,44 @@ services:
       timeout: 5s
       retries: 3
 
+  chat_service:
+    build:
+      context: ./chat_service
+    container_name: chat_service
+    restart: always
+    depends_on:
+      confero_db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      auth_service:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./chat_service:/app
+    networks:
+      - confero_network
+    command: >
+      sh -c "daphne -b 0.0.0.0 -p 8002 chat_service.asgi:application"
+    environment:
+      - DATABASE_URL=postgresql://confero_user:confero_pass@confero_db:5432/confero_db
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=admin
+      - RABBITMQ_PASS=adminpassword
+      - RABBITMQ_VHOST=/
+      - JWT_SIGNING_KEY=a-string-secret-at-least-256-bits-long
+      - AUTH_SERVICE_URL=http://auth_service:8000/api/
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
 volumes:
   postgres_data:

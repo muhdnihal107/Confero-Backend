@@ -1,3 +1,4 @@
+# rooms/rabbitmq_consumer.py
 
 
 import pika
@@ -17,7 +18,6 @@ def publish_to_rabbitmq(event_type, room_id, user_email):
         user_email (str): The email of the user involved in the event.
     """
     try:
-        # Get RabbitMQ configuration from environment variables
         rabbitmq_host = os.getenv('RABBITMQ_HOST', 'rabbitmq')
         rabbitmq_port = int(os.getenv('RABBITMQ_PORT', 5672))
         rabbitmq_user = os.getenv('RABBITMQ_USER', 'admin')
@@ -63,7 +63,6 @@ def publish_to_rabbitmq(event_type, room_id, user_email):
         logger.error(f"Error publishing to RabbitMQ: {str(e)}")
         raise
 
-# # rooms/rabbitmq_consumer.py
 # import json
 # import pika
 # import os

@@ -33,6 +33,13 @@ class RoomView(APIView):
 
             data = request.data.copy()
             data['creator_id'] = request.user.id
+            data['creator_email'] = request.user.email
+
+            # Initialize participants and add creator
+            if 'participants' not in data or not isinstance(data['participants'], list):
+                data['participants'] = [request.user.email]
+            elif request.user.email not in data['participants']:
+                data['participants'].append(request.user.email)
             
             serializer = RoomSerializer(data=data)
             if serializer.is_valid():
@@ -42,7 +49,7 @@ class RoomView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+#---------------------------------------------------------------------------------------------------------------
 class RoomUpdateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -159,20 +166,20 @@ class AcceptRoomInviteView(APIView):
         room = get_object_or_404(Room, id=room_id)
         user = request.user
 
-        # Check if user was invited
+        if not hasattr(user, 'email') or not user.email:
+            logger.error(f"User {user.id} has no email address")
+            return Response({"error": "User email not found"}, status=status.HTTP_400_BAD_REQUEST)
+
         if user.id not in room.invited_users:
             return Response({"error": f"{user.id} were not invited to this room"}, 
                           status=status.HTTP_403_FORBIDDEN)
 
-        # Add user to participants (if not already there)
-        if str(user.id) not in room.participants:  # Convert to string for JSONField consistency
-            room.participants.append(str(user.id))
+        if user.email not in room.participants:  # Convert to string for JSONField consistency
+            room.participants.append(user.email)
         
-        # Remove user from invited_users
         room.invited_users.remove(user.id)
         room.save()
 
-        # Send notification to creator
         self.send_acceptance_notification(room, user)
 
         return Response({"message": f"Joined room {room.name} successfully!"}, 
@@ -224,21 +231,17 @@ class JoinPublicRoomView(APIView):
         room = get_object_or_404(Room, id=room_id)
         user = request.user
 
-        # Check if the room is public
         if room.visibility != 'public':
             return Response({"error": "This room is private. You need an invitation to join."}, 
                           status=status.HTTP_403_FORBIDDEN)
 
-        # Check if user is already a participant
         if str(user.id) in room.participants:
             return Response({"error": "You are already a participant in this room."}, 
                           status=status.HTTP_400_BAD_REQUEST)
 
-        # Add user to participants
         room.participants.append(str(user.id))
         room.save()
 
-        # Send notification to creator
         self.send_join_notification(room, user)
 
         return Response({"message": f"Successfully joined public room '{room.name}'!"}, 
@@ -294,6 +297,13 @@ class DeleteRoom(APIView):
 class HealthCheckView(APIView):
     def get(self, request):
         return Response({"status": "ok"}, status=200)
+
+
+class DeleteAllRooms(APIView):
+    def delete(self,request):
+        room= Room.objects.all()
+        room.delete()
+        return Response({"deleted":"deleted all"},status=status.HTTP_204_NO_CONTENT)
 
 
 # from utils.rabbitmq import RabbitMQClient

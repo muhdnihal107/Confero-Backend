@@ -64,6 +64,8 @@ CHANNEL_LAYERS = {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
             'hosts': [('redis', 6379)],  # Add Redis service to docker-compose later
+            'expiry': 3600,
+            'channel_capacity': {'*': 1000},
         },
     },
 }
@@ -92,10 +94,14 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'room_service.wsgi.application'
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://localhost:8000",
-]
+# CORS_ALLOWED_ORIGINS = [
+#     "http://localhost:5173",
+#     "http://localhost:8001",
+#     "http://localhost:8003",
+#     "http://auth_service:8000",  # Add this to allow Docker service
+#     "http://notification_service:8000",
+#     "http://room_service:8000",
+# ]
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
@@ -172,7 +178,7 @@ AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth_service:8000/api/"
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=2),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'SIGNING_KEY': os.getenv('JWT_SIGNING_KEY', 'your-shared-jwt-signing-key-here'),  
+    'SIGNING_KEY': os.getenv('JWT_SIGNING_KEY', 'a-string-secret-at-least-256-bits-long'),  
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
@@ -207,3 +213,13 @@ ICE_SERVERS = [
     # {'urls': 'turn:your-turn-server.com:3478', 'username': 'user', 'credential': 'pass'},
 ]
 
+
+# CACHES = {
+#     'default': {
+#         'BACKEND': 'django_redis.cache.RedisCache',
+#         'LOCATION': 'redis://redis:6379/1',  # Use 'redis' hostname, DB 1 to avoid conflict with CHANNEL_LAYERS
+#         'OPTIONS': {
+#             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+#         }
+#     }
+# }
