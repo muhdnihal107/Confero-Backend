@@ -235,11 +235,11 @@ class JoinPublicRoomView(APIView):
             return Response({"error": "This room is private. You need an invitation to join."}, 
                           status=status.HTTP_403_FORBIDDEN)
 
-        if str(user.id) in room.participants:
+        if user.email in room.participants:
             return Response({"error": "You are already a participant in this room."}, 
                           status=status.HTTP_400_BAD_REQUEST)
 
-        room.participants.append(str(user.id))
+        room.participants.append(user.email)
         room.save()
 
         self.send_join_notification(room, user)
