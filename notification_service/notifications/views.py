@@ -7,14 +7,34 @@ from .models import Notification
 from .serializers import NotificationSerializer
 from rest_framework.decorators import api_view,permission_classes
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from django.db.models import Q
 
 class NotificationListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        notifications = Notification.objects.filter(user_id=request.user.id)
+        notifications = Notification.objects.filter(Q(user_id=request.user.id) & Q(is_read=False))
         serializer = NotificationSerializer(notifications, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+class ReadedNotificationListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        notifications = Notification.objects.filter(Q(user_id=request.user.id) & Q(is_read=True))
+        serializer = NotificationSerializer(notifications, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+class NotificationReadView(APIView):
+    def patch(self,request,id):
+        try:    
+            notification = Notification.objects.get(id=id)
+            notification.is_read=True
+            notification.save()
+            serializer= NotificationSerializer(notification)
+            return Response(status=status.HTTP_200_OK)
+        except Notification.DoesNotExist:
+            return Response({"error": "Notification not found"}, status=status.HTTP_404_NOT_FOUND)            
     
 class NotificationAllView(APIView):
     def get(self,request):

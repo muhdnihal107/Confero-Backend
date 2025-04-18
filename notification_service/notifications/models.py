@@ -6,7 +6,7 @@ from asgiref.sync import async_to_sync
 
 class Notification(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user_id = models.IntegerField(db_index=True)  # Store CustomUser ID from auth_service
+    user_id = models.IntegerField(db_index=True)  
     friend_requestId = models.IntegerField(null=True,blank=True)
     notification_type = models.CharField(max_length=50)
     message = models.TextField()
