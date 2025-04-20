@@ -1,6 +1,6 @@
 
 from django.urls import path
-from .views import RegisterView, LoginView,ProfileView,VerifyEmailView,ForgotPasswordView,ResetPasswordView,google_login,FetchAllProflieView,ValidateTokenView,FriendRequestView,FriendRequestActionView, UserListView,UserDetailView,FetchFriendsView
+from .views import RegisterView, LoginView,ProfileView,VerifyEmailView,ForgotPasswordView,ResetPasswordView,google_login,FetchAllProflieView,ValidateTokenView,FriendRequestView,FriendRequestActionView, UserListView,UserDetailView,FetchFriendsView,FetchStrangersView,FriendCountView
 
 urlpatterns = [
     path('users/', UserListView.as_view(), name='register'),
@@ -18,5 +18,7 @@ urlpatterns = [
     path('friend-request/<int:request_id>/action/', FriendRequestActionView.as_view(), name='friend-request-action'),
     path("user-details/<int:id>/",UserDetailView.as_view(), name="user-detail"),
     path("fetch-friends/",FetchFriendsView.as_view(), name="fetch-friend"),
+    path("fetch-strangers/",FetchStrangersView.as_view(), name="fetch-stranger"),
+    path('friend-count/', FriendCountView.as_view(), name='friend_count'),
 
 ]

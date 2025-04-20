@@ -18,6 +18,7 @@ from google.auth.transport import requests
 from django.shortcuts import get_object_or_404
 import jwt
 from django.conf import settings
+from django.db.models import Q,Count
 logging.basicConfig(level=logging.DEBUG)
 
 logger = logging.getLogger("django")
@@ -420,5 +421,32 @@ class FetchFriendsView(APIView):
         friend_profiles = [friend.friend.profile for friend in friends if hasattr(friend.friend, "profile")]
         serializer = ProfileSerializer(friend_profiles, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+#-------------------------------------------------------------------------------------------------- 
 
+
+class FetchStrangersView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        friend_ids = Friendship.objects.filter(user=request.user).values_list('friend__id', flat=True) 
+        strangers = CustomUser.objects.exclude(id__in=friend_ids).exclude(id=request.user.id).prefetch_related('profile')
+        stranger_profiles = [user.profile for user in strangers if hasattr(user, 'profile')]
+        serializer = ProfileSerializer(stranger_profiles, many=True)
+        
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+
+#-------------------------------------------------------------------------------------------------- 
+
+class FriendCountView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        friend_count = Friendship.objects.filter(
+            Q(user=request.user) | Q(friend=request.user)
+        ).aggregate(total_friends=Count('id'))['total_friends'] or 0
+        
+        return Response({'friend_count': friend_count}, status=status.HTTP_200_OK)
  
+

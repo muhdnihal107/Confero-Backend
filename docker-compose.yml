@@ -202,6 +202,42 @@ services:
       timeout: 5s
       retries: 3
 
+  video_service:
+    build:
+      context: ./video_service
+    container_name: video_service
+    restart: always
+    depends_on:
+      confero_db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      auth_service:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    ports:
+      - "8004:8004"
+    volumes:
+      - ./video_service:/app
+    networks:
+      - confero_network
+    command: >
+      sh -c "daphne -b 0.0.0.0 -p 8004 video_service.asgi:application"
+    environment:
+      - DJANGO_SETTINGS_MODULE=video_service.settings
+      - DATABASE_URL=postgresql://confero_user:confero_pass@confero_db:5432/confero_db
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=admin
+      - RABBITMQ_PASS=adminpassword
+      - RABBITMQ_VHOST=/
+      - JWT_SIGNING_KEY=a-string-secret-at-least-256-bits-long
+      - AUTH_SERVICE_URL=http://auth_service:8000/api/
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+
 volumes:
   postgres_data:
   rabbitmq_data:
