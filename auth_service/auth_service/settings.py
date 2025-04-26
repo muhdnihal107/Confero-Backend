@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework.authtoken',
     'accounts',
+    # 'accounts.apps.AccountsConfig',  # Use the app config
     # 'social_django',
     
     'django.contrib.sites',  # Required for allauth
@@ -217,3 +218,34 @@ RABBITMQ = {
     'PASSWORD': 'adminpassword',
     'VHOST': '/',
 }
+
+CELERY_BROKER_URL = f'amqp://{os.getenv("RABBITMQ_USER", "admin")}:{os.getenv("RABBITMQ_PASS", "adminpassword")}@{os.getenv("RABBITMQ_HOST", "rabbitmq")}:{os.getenv("RABBITMQ_PORT", 5672)}/{os.getenv("RABBITMQ_VHOST", "/")}'
+CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'UTC'
+
+
+# auth_service/settings.py
+RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "rabbitmq")
+RABBITMQ_PORT = os.getenv("RABBITMQ_PORT", 5672)
+RABBITMQ_USER = os.getenv("RABBITMQ_USER", "admin")
+RABBITMQ_PASS = os.getenv("RABBITMQ_PASS", "adminpassword")
+RABBITMQ_VHOST = os.getenv("RABBITMQ_VHOST", "/")
+
+# LOGGING = {
+#     'version': 1,
+#     'disable_existing_loggers': False,
+#     'handlers': {
+#         'console': {
+#             'class': 'logging.StreamHandler',
+#         },
+#     },
+#     'loggers': {
+#         '': {
+#             'handlers': ['console'],
+#             'level': 'INFO',
+#         },
+#     },
+# }

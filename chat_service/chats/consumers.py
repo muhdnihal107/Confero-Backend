@@ -1,4 +1,4 @@
-# chat_service/chats/consumers.py (minor update)
+# chat_service/chats/consumers.py
 import json
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from channels.db import database_sync_to_async
@@ -27,6 +27,18 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
         logger.info(f"{self.user.email} connected to {self.group_name}")
+
+        # Mark messages as read upon connection
+        updated_message_ids = await self.mark_messages_as_read()
+        if updated_message_ids:
+            await self.channel_layer.group_send(
+                self.group_name,
+                {
+                    'type': 'read_receipt',
+                    'user_email': self.user.email,
+                    'message_ids': updated_message_ids
+                }
+            )
 
     async def disconnect(self, close_code):
         if hasattr(self, 'group_name'):
@@ -60,12 +72,12 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
                 {
                     'type': 'chat_message',
                     'message': {
-                        'id': str(message.id),  # Ensure UUID as string
+                        'id': str(message.id),
                         'sender_email': message.sender_email,
                         'content': message.content,
                         'message_type': message.message_type,
                         'created_at': message.created_at.isoformat(),
-                        'chat_group': str(message.chat_group.id),  # Ensure UUID as string
+                        'chat_group': str(message.chat_group.id),
                         'read_by': message.read_by
                     }
                 }
@@ -76,6 +88,13 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
 
     async def chat_message(self, event):
         await self.send_json(event['message'])
+
+    async def read_receipt(self, event):
+        await self.send_json({
+            'type': 'read_receipt',
+            'user_email': event['user_email'],
+            'message_ids': event['message_ids']
+        })
 
     @database_sync_to_async
     def is_valid_participant(self):
@@ -95,3 +114,22 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
             content=content,
         )
         return message
+
+    @database_sync_to_async
+    def mark_messages_as_read(self):
+        try:
+            group = ChatGroup.objects.get(id=self.chat_group_id)
+            messages = Message.objects.filter(
+                chat_group=group,
+                read_by__not__contains=[self.user.email]
+            ).exclude(sender_email=self.user.email)
+            updated_message_ids = []
+            for message in messages:
+                message.read_by.append(self.user.email)
+                message.save()
+                updated_message_ids.append(str(message.id))
+            logger.info(f"{len(updated_message_ids)} messages marked as read by {self.user.email} in chat {self.chat_group_id}")
+            return updated_message_ids
+        except ChatGroup.DoesNotExist:
+            logger.error(f"Chat group {self.chat_group_id} does not exist")
+            return []

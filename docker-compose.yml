@@ -27,6 +27,8 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8000:8000"
     volumes:
@@ -43,6 +45,8 @@ services:
       - RABBITMQ_PASS=adminpassword
       - RABBITMQ_VHOST=/
       - JWT_SIGNING_KEY=a-string-secret-at-least-256-bits-long
+      - CELERY_BROKER_URL=amqp://admin:adminpassword@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
 
   room_service:
     build:

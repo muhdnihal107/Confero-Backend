@@ -4,9 +4,12 @@ import pika
 import os
 import sys
 import django
+import logging
 from django.conf import settings
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+
+logger = logging.getLogger(__name__)
 
 # Set up Django environment
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "notification_service.settings")
@@ -34,7 +37,7 @@ def process_notification(ch, method, properties, body):
             friend_requestId=friend_request_id if friend_request_id else None
         )
         print(f"✅ Notification saved for user {receiver_id}")
-
+        logger.info(f"Notification saved for user {receiver_id}, ID: {notification.id}")
         # Broadcast to WebSocket group
         channel_layer = get_channel_layer()
         async_to_sync(channel_layer.group_send)(

@@ -35,11 +35,12 @@ class RoomView(APIView):
             data['creator_id'] = request.user.id
             data['creator_email'] = request.user.email
 
-            # Initialize participants and add creator
             if 'participants' not in data or not isinstance(data['participants'], list):
                 data['participants'] = [request.user.email]
             elif request.user.email not in data['participants']:
                 data['participants'].append(request.user.email)
+            if 'thumbnail' not in data or data['thumbnail'] is None:
+                data.pop('thumbnail', None)
             
             serializer = RoomSerializer(data=data)
             if serializer.is_valid():

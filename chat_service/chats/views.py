@@ -11,6 +11,10 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 import uuid
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class ChatGroupListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -47,9 +51,6 @@ class MessageListCreateView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request):
-        """
-        Create a new message and broadcast it to the chat group via WebSocket.
-        """
         serializer = MessageSerializer(data=request.data)
         if serializer.is_valid():
             try:
@@ -60,11 +61,9 @@ class MessageListCreateView(APIView):
                         status=status.HTTP_403_FORBIDDEN
                     )
                 message = serializer.save(sender_email=request.user.email)
-                # Convert UUIDs to strings for WebSocket broadcast
                 message_data = MessageSerializer(message).data
                 message_data['id'] = str(message_data['id'])
                 message_data['chat_group'] = str(message_data['chat_group'])
-                # Broadcast to WebSocket group
                 channel_layer = get_channel_layer()
                 chat_group_id = str(serializer.validated_data['chat_group'].id)
                 async_to_sync(channel_layer.group_send)(
@@ -81,3 +80,77 @@ class MessageListCreateView(APIView):
                     status=status.HTTP_404_NOT_FOUND
                 )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+class MarkMessagesReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        chat_group_id = request.data.get('chat_group')
+        try:
+            uuid.UUID(chat_group_id)  
+            chat_group = ChatGroup.objects.get(id=chat_group_id)
+            if request.user.email not in chat_group.participant_emails:
+                return Response(
+                    {"error": "You are not a participant in this chat"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            messages = Message.objects.filter(
+                chat_group=chat_group,
+                read_by__not__contains=[request.user.email]
+            ).exclude(sender_email=request.user.email)
+            updated_count = 0
+            updated_message_ids = []
+            for message in messages:
+                message.read_by.append(request.user.email)
+                message.save()
+                updated_count += 1
+                updated_message_ids.append(str(message.id))
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f"chat_{chat_group_id}",
+                {
+                    'type': 'read_receipt',
+                    'user_email': request.user.email,
+                    'message_ids': updated_message_ids
+                }
+            )
+            logger.info(f"{updated_count} messages marked as read by {request.user.email} in chat {chat_group_id}")
+            return Response(
+                {"message": f"{updated_count} messages marked as read"},
+                status=status.HTTP_200_OK
+            )
+        except ValueError:
+            return Response(
+                {"error": "Invalid chat_group UUID"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except ObjectDoesNotExist:
+            return Response(
+                {"error": "Chat group does not exist"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+
+class ChatGroupUpdateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, group_id):
+        try:
+            # No need to validate group_id as UUID; it's already a UUID object from the URL
+            chat_group = ChatGroup.objects.get(id=group_id)
+            # Check if the user is a participant (adjust 'participants' if the field is named differently)
+            if request.user.email not in chat_group.participants:
+                return Response(
+                    {"error": "You are not a participant in this chat"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            serializer = ChatGroupSerializer(chat_group, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except ObjectDoesNotExist:
+            return Response(
+                {"error": "Chat group does not exist"},
+                status=status.HTTP_404_NOT_FOUND
+            )

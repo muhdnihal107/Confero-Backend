@@ -439,14 +439,15 @@ class FetchStrangersView(APIView):
 
 #-------------------------------------------------------------------------------------------------- 
 
+
+
 class FriendCountView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        friend_count = Friendship.objects.filter(
-            Q(user=request.user) | Q(friend=request.user)
-        ).aggregate(total_friends=Count('id'))['total_friends'] or 0
+        friend_count = Friendship.objects.filter(user=request.user).count()
         
         return Response({'friend_count': friend_count}, status=status.HTTP_200_OK)
  
+
 

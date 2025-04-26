@@ -23,7 +23,6 @@ class Room(models.Model):
     session_id = models.CharField(max_length=100, blank=True, null=True)  # Clarify purpose later
 
     def add_participant(self, user_email):
-        """Add a participant atomically."""
         validate_email(user_email)
         with transaction.atomic():
             room = Room.objects.select_for_update().get(id=self.id)
