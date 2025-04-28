@@ -17,6 +17,7 @@ class Room(models.Model):
     visibility = models.CharField(max_length=10, choices=VISIBILITY_CHOICES, default='public')
     invited_users = models.JSONField(default=list)
     thumbnail = models.ImageField(upload_to='room_thumbnails/', blank=True, null=True)
+    is_live = models.BooleanField(default=False,blank=True,null=True)
     participants = models.JSONField(default=list)  
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -62,6 +63,7 @@ class Room(models.Model):
             models.Index(fields=['slug']),
             models.Index(fields=['creator_id']),
             models.Index(fields=['name']),
+            models.Index(fields=['is_live']), 
         ]
     
 class RoomInvite(models.Model):

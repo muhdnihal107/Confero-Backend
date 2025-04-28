@@ -28,27 +28,60 @@ class RoomView(APIView):
     def post(self, request):
         try:
             if not request.user.is_authenticated:
+                logger.error("Unauthenticated user attempted to create room")
                 return Response({"error": "User not authenticated"}, status=status.HTTP_401_UNAUTHORIZED)
-            
 
-            data = request.data.copy()
+            # Create a mutable copy of request.data
+            data = request.data if isinstance(request.data, dict) else dict(request.data)
             data['creator_id'] = request.user.id
             data['creator_email'] = request.user.email
 
-            if 'participants' not in data or not isinstance(data['participants'], list):
+            # Handle participants
+            if 'participants' not in data or not isinstance(data.get('participants'), list):
                 data['participants'] = [request.user.email]
             elif request.user.email not in data['participants']:
                 data['participants'].append(request.user.email)
-            if 'thumbnail' not in data or data['thumbnail'] is None:
+
+            # Handle thumbnail (multipart/form-data)
+            if 'thumbnail' in request.FILES:
+                data['thumbnail'] = request.FILES['thumbnail']
+                logger.debug(f"Received thumbnail: {data['thumbnail'].name}, size: {data['thumbnail'].size} bytes")
+            else:
                 data.pop('thumbnail', None)
-            
+                logger.debug("No thumbnail provided")
+
+            # Log the data being serialized
+            logger.debug(f"Room creation data: {data}")
+
             serializer = RoomSerializer(data=data)
             if serializer.is_valid():
-                serializer.save()
+                room = serializer.save()
+                logger.info(f"Room created successfully: ID={room.id}, Name={room.name}")
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
+            
+            logger.error(f"Serializer errors: {serializer.errors}")
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.exception(f"Failed to create room: {str(e)}")
+            return Response({"error": f"Internal server error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+#---------------------------------------------------------------------------------------------------------------
+class RoomCreateAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        # First, copy the incoming request data
+        data = request.data.copy()
+
+        # Then add creator_id and creator_email from the authenticated user
+        data['creator_id'] = request.user.id
+        data['creator_email'] = request.user.email
+
+        serializer = RoomSerializer(data=data)
+        if serializer.is_valid():
+            room = serializer.save()
+            return Response(RoomSerializer(room).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 #---------------------------------------------------------------------------------------------------------------
 class RoomUpdateAPIView(APIView):

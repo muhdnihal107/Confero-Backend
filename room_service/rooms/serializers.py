@@ -1,18 +1,13 @@
 from rest_framework import serializers
 from .models import Room,RoomInvite
-
+import mimetypes
 class RoomSerializer(serializers.ModelSerializer):
     class Meta:
         model = Room
         fields = ['id', 'creator_id', 'creator_email', 'name', 'slug', 'description', 
-                 'visibility', 'invited_users', 'thumbnail', 'participants', 
+                 'visibility', 'invited_users', 'thumbnail', 'participants','is_live', 
                  'created_at', 'updated_at']
         read_only_fields = ['id', 'slug', 'created_at', 'updated_at']
-    def validate_thumbnail(self, value):
-        if value.size > 5 * 1024 * 1024:  # 5MB in bytes
-            raise serializers.ValidationError("Thumbnail file size must be less than 5MB.")
-
-
     def validate(self, value):
         if Room.objects.filter(name=value).exists():
             raise serializers.ValidationError("A room with this name already exists.")
