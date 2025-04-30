@@ -301,12 +301,15 @@ class FriendRequestView(APIView):
         receiver_id = request.data.get("receiver_id")
         receiver = get_object_or_404(CustomUser, id=receiver_id)
 
+        existing_request = FriendRequest.objects.filter(sender=sender, receiver=receiver).first()
+
+
         if FriendRequest.objects.filter(sender=sender, receiver=receiver).exists():
+            self.send_notification(existing_request)
             return Response({"error": "Friend request already sent."}, status=status.HTTP_400_BAD_REQUEST)
 
         friend_request = FriendRequest.objects.create(sender=sender, receiver=receiver)
 
-        logger.info("test1")
         self.send_notification(friend_request)
 
         return Response({"message": "Friend request sent!"}, status=status.HTTP_201_CREATED)

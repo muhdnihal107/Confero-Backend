@@ -377,6 +377,19 @@ class RoomConsumer(AsyncWebsocketConsumer):
         except Exception as e:
             logger.error(f"Error updating live status for room {self.room_id}: {e}")
 
+
+    @database_sync_to_async
+    def clear_participants(self):
+        try:
+            room = Room.objects.get(id=self.room_id)
+            room.participants = []
+            room.save()
+            logger.info(f"Cleared participants for room {self.room_id}")
+        except Room.DoesNotExist:
+            logger.error(f"Room {self.room_id} does not exist")
+        except Exception as e:
+            logger.error(f"Error clearing participants for room {self.room_id}: {e}")
+
     async def increment_connection_count(self):
         redis_client = redis.Redis(
             host=settings.CHANNEL_LAYERS['default']['CONFIG']['hosts'][0][0],
@@ -406,6 +419,7 @@ class RoomConsumer(AsyncWebsocketConsumer):
             # Set is_live to False if no connections remain
             if count <= 0:
                 await self.update_room_live_status(is_live=False)
+                await self.clear_participants()  # MODIFIED: Added call to clear_participants
                 await redis_client.delete(f"room:{self.room_id}:connections")  # Clean up
         except Exception as e:
             logger.error(f"Error decrementing connection count for room {self.room_id}: {e}")

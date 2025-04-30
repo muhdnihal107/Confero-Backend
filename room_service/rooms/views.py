@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from .models import Room
-from .serializers import RoomSerializer,RoomUpdateSerializer
+from .serializers import RoomSerializer,RoomUpdateSerializer,VideoCallScheduleSerializer
 import requests
 import logging
 import pika
@@ -70,10 +70,8 @@ class RoomCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
-        # First, copy the incoming request data
         data = request.data.copy()
 
-        # Then add creator_id and creator_email from the authenticated user
         data['creator_id'] = request.user.id
         data['creator_email'] = request.user.email
 
@@ -120,9 +118,9 @@ class PublicRoomsView(APIView):
         serializer = RoomSerializer(public_rooms, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 #----------------------------------------------------------------------------------------------- 
-
+from .tasks import send_room_invite_email
 import logging
-
+from celery.exceptions import OperationalError
 logger = logging.getLogger(__name__)
 
 class InviteFriendView(APIView):
@@ -145,6 +143,7 @@ class InviteFriendView(APIView):
 
         # Check if already invited
         if receiver_id in room.invited_users:
+            self.send_notification(room, receiver_id, sender)
             return Response({"error": "Friend already invited to this room"}, 
                           status=status.HTTP_400_BAD_REQUEST)
 
@@ -154,7 +153,17 @@ class InviteFriendView(APIView):
 
         # Send notification
         self.send_notification(room, receiver_id, sender)
-
+        try:
+            send_room_invite_email.delay(
+                room_id=room.id,
+                receiver_id=receiver_id,
+                sender_email=sender.email,
+                friend_email=friend_email
+            )
+            logger.info(f"Queued email task for {friend_email} for room {room.id}-----{sender.email}")
+        except OperationalError as e:
+            logger.error(f"Failed to queue email task: {str(e)}")
+            return Response({"message":"couldnt send email"},status=status.HTTP_400_BAD_REQUEST)
         return Response({"message": f"Invited user {friend_email} to room {room.name}!"}, 
                       status=status.HTTP_200_OK)
 
@@ -319,9 +328,9 @@ class JoinPublicRoomView(APIView):
 #-----------------------------------------------------------------------------------------------
 
 class DeleteRoom(APIView):
-    def delete(self,request):
-        id = request.data["id"]
-        room=Room.objects.filter(id=id)
+    permission_classes=[IsAuthenticated]
+    def delete(self,request,room_id):
+        room=Room.objects.filter(id=room_id)
 
         room.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -339,38 +348,55 @@ class DeleteAllRooms(APIView):
         room.delete()
         return Response({"deleted":"deleted all"},status=status.HTTP_204_NO_CONTENT)
 
+#------------------------------------------------------------------------------------------------------
+class ScheduleVideoCallView(APIView):
+    permission_classes = [IsAuthenticated]
 
-# from utils.rabbitmq import RabbitMQClient
+    def post(self, request):
+        serializer = VideoCallScheduleSerializer(data={
+            'room': request.data.get('room_id'),
+            'participants': request.data.get('participants', []),
+            'scheduled_time': request.data.get('scheduled_time'),
+            'creator': request.user.id
+        })
+        if serializer.is_valid():
+            schedule = serializer.save()
+            self.send_schedule_notification(schedule, request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# class JoinRoomView(APIView):
-#     permission_classes = [IsAuthenticated]
+    def send_schedule_notification(self, schedule, sender):
+        try:
+            credentials = pika.PlainCredentials(
+                os.getenv('RABBITMQ_USER', 'admin'),
+                os.getenv('RABBITMQ_PASS', 'adminpassword')
+            )
+            connection = pika.BlockingConnection(
+                pika.ConnectionParameters(
+                    host=os.getenv('RABBITMQ_HOST', 'rabbitmq'),
+                    port=int(os.getenv('RABBITMQ_PORT', 5672)),
+                    credentials=credentials
+                )
+            )
+            channel = connection.channel()
+            channel.queue_declare(queue="notification_queue", durable=True)
 
-#     def post(self, request, slug):
-#         user_email = request.user.email
-#         try:
-#             room = Room.objects.get(slug=slug)
-#             if room.visibility == 'public' or user_email in room.invited_users or user_email == room.creator_email:
-#                 if user_email not in room.participants:
-#                     room.participants.append(user_email)
-#                     room.save()
-
-#                     # Publish a message to RabbitMQ
-#                     rabbitmq_client = RabbitMQClient()
-#                     rabbitmq_client.connect()
-#                     rabbitmq_client.publish_message(
-#                         queue_name='room_events',
-#                         message={
-#                             'event': 'user_joined',
-#                             'room_id': room.id,
-#                             'room_name': room.name,
-#                             'user_email': user_email
-#                         }
-#                     )
-#                     rabbitmq_client.close()
-
-#                 return Response({"message": "Joined room successfully"}, status=status.HTTP_200_OK)
-#             return Response({"error": "You are not authorized to join this room"}, status=status.HTTP_403_FORBIDDEN)
-#         except Room.DoesNotExist:
-#             return Response({"error": "Room not found"}, status=status.HTTP_404_NOT_FOUND)
+            for participant_id in schedule.participants:
+                notification_data = {
+                    "receiver_id": str(participant_id),
+                    "message": f"{sender.email} scheduled a video call in room '{schedule.room.name}' for {schedule.scheduled_time}.",
+                    "type": "video_call_schedule",
+                    "friend_request_id": str(schedule.id),  # Using for schedule ID
+                }
+                channel.basic_publish(
+                    exchange="",
+                    routing_key="notification_queue",
+                    body=json.dumps(notification_data),
+                    properties=pika.BasicProperties(delivery_mode=2)
+                )
+                logger.info(f"Notification sent to user {participant_id} for video call schedule {schedule.id}")
+            connection.close()
+        except Exception as e:
+            logger.error(f"Error sending schedule notification: {e}")
         
 

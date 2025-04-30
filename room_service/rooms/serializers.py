@@ -1,6 +1,9 @@
 from rest_framework import serializers
-from .models import Room,RoomInvite
+from .models import Room,RoomInvite,VideoCallSchedule
 import mimetypes
+from django.utils import timezone
+
+
 class RoomSerializer(serializers.ModelSerializer):
     class Meta:
         model = Room
@@ -23,6 +26,24 @@ class RoomUpdateSerializer(serializers.ModelSerializer):
         if Room.objects.exclude(id=room_id).filter(name=value).exists():
             raise serializers.ValidationError("A room with this name already exists.")
         return value
+
+
+class VideoCallScheduleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VideoCallSchedule
+        fields = ['id', 'room', 'participants', 'scheduled_time', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+    def validate_scheduled_time(self, value):
+        if value <= timezone.now():
+            raise serializers.ValidationError("Scheduled time must be in the future.")
+        return value
+
+    def validate_participants(self, value):
+        if not value:
+            raise serializers.ValidationError("At least one participant is required.")
+        return value
+
 
         
 class RoomInviteSerializer(serializers.ModelSerializer):

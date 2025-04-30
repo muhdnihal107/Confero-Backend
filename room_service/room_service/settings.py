@@ -223,3 +223,49 @@ ICE_SERVERS = [
 #         }
 #     }
 # }
+
+# room_service/settings.py
+CELERY_BROKER_URL = 'redis://redis:6379/0'  # Use Redis as the broker
+CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'UTC'
+
+
+
+# settings.py
+# room_service/settings.py
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'muhdnihal132@gmail.com'
+EMAIL_HOST_PASSWORD = 'zpek ublv btdl ffpp'  # Use an App Password if using Gmail
+DEFAULT_FROM_EMAIL = 'muhdnihal132@gmail.com'
+
+
+# room_service/settings.py
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        '': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+    },
+}
+
+CELERY_BEAT_SCHEDULE = {
+    'check-scheduled-video-calls': {
+        'task': 'rooms.tasks.check_scheduled_video_calls',
+        'schedule': 60.0,  # Run every 60 seconds
+    },
+}

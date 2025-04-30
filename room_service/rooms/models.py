@@ -2,6 +2,7 @@ from django.db import models, transaction
 from django.utils.text import slugify
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 class Room(models.Model):
     VISIBILITY_CHOICES = [
@@ -65,7 +66,35 @@ class Room(models.Model):
             models.Index(fields=['name']),
             models.Index(fields=['is_live']), 
         ]
-    
+
+class VideoCallSchedule(models.Model):
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="schedules")
+    creator = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name="created_schedules")
+    participants = models.JSONField(default=list)  # List of user IDs
+    scheduled_time = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_notified = models.BooleanField(default=False)  # Track if start notification sent
+
+    def clean(self):
+        if self.scheduled_time <= timezone.now():
+            raise ValidationError("Scheduled time must be in the future.")
+        if not self.participants:
+            raise ValidationError("At least one participant is required.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()  # Run validation before saving
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Video call in {self.room.name} at {self.scheduled_time}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['scheduled_time']),
+            models.Index(fields=['is_notified']),
+        ]
+
+
 class RoomInvite(models.Model):
     room = models.ForeignKey(Room,on_delete=models.CASCADE)
     inviter_id = models.IntegerField()
