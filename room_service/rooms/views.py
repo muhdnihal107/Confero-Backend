@@ -349,15 +349,19 @@ class DeleteAllRooms(APIView):
         return Response({"deleted":"deleted all"},status=status.HTTP_204_NO_CONTENT)
 
 #------------------------------------------------------------------------------------------------------
+logger = logging.getLogger(__name__)
+
 class ScheduleVideoCallView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        participants = request.data.get('participants', [])  # Expect [{"id": int, "email": str}, ...]
         serializer = VideoCallScheduleSerializer(data={
             'room': request.data.get('room_id'),
-            'participants': request.data.get('participants', []),
+            'participants': participants,
             'scheduled_time': request.data.get('scheduled_time'),
-            'creator': request.user.id
+            'creator_id': request.user.id,
+            'creator_email': request.user.email,
         })
         if serializer.is_valid():
             schedule = serializer.save()
@@ -381,12 +385,12 @@ class ScheduleVideoCallView(APIView):
             channel = connection.channel()
             channel.queue_declare(queue="notification_queue", durable=True)
 
-            for participant_id in schedule.participants:
+            for participant in schedule.participants:
                 notification_data = {
-                    "receiver_id": str(participant_id),
+                    "receiver_id": str(participant['id']),
                     "message": f"{sender.email} scheduled a video call in room '{schedule.room.name}' for {schedule.scheduled_time}.",
                     "type": "video_call_schedule",
-                    "friend_request_id": str(schedule.id),  # Using for schedule ID
+                    "friend_request_id": str(schedule.id),
                 }
                 channel.basic_publish(
                     exchange="",
@@ -394,7 +398,7 @@ class ScheduleVideoCallView(APIView):
                     body=json.dumps(notification_data),
                     properties=pika.BasicProperties(delivery_mode=2)
                 )
-                logger.info(f"Notification sent to user {participant_id} for video call schedule {schedule.id}")
+                logger.info(f"Notification sent to user {participant['id']} for video call schedule {schedule.id}")
             connection.close()
         except Exception as e:
             logger.error(f"Error sending schedule notification: {e}")

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Room,RoomInvite,VideoCallSchedule
+from .models import Room,VideoCallSchedule
 import mimetypes
 from django.utils import timezone
 
@@ -31,7 +31,7 @@ class RoomUpdateSerializer(serializers.ModelSerializer):
 class VideoCallScheduleSerializer(serializers.ModelSerializer):
     class Meta:
         model = VideoCallSchedule
-        fields = ['id', 'room', 'participants', 'scheduled_time', 'created_at']
+        fields = ['id', 'room', 'creator_id', 'creator_email', 'participants', 'scheduled_time', 'created_at']
         read_only_fields = ['id', 'created_at']
 
     def validate_scheduled_time(self, value):
@@ -42,43 +42,46 @@ class VideoCallScheduleSerializer(serializers.ModelSerializer):
     def validate_participants(self, value):
         if not value:
             raise serializers.ValidationError("At least one participant is required.")
+        for p in value:
+            if not isinstance(p, dict) or 'id' not in p or 'email' not in p:
+                raise serializers.ValidationError("Each participant must have an 'id' and 'email'.")
         return value
 
 
         
-class RoomInviteSerializer(serializers.ModelSerializer):
-    invitee_id = serializers.IntegerField()
-    room_slug = serializers.SlugField()
+# class RoomInviteSerializer(serializers.ModelSerializer):
+#     invitee_id = serializers.IntegerField()
+#     room_slug = serializers.SlugField()
 
-    class Meta:
-        model = RoomInvite
-        fields = ['id', 'inviter_id', 'invitee_id', 'room_slug']
+#     class Meta:
+#         model = RoomInvite
+#         fields = ['id', 'inviter_id', 'invitee_id', 'room_slug']
 
-    def validate(self, data):
-        inviter_id = self.context['request'].user.id
-        invitee_id = data.get('invitee_id')
-        room_slug = data.get('room_slug')
+#     def validate(self, data):
+#         inviter_id = self.context['request'].user.id
+#         invitee_id = data.get('invitee_id')
+#         room_slug = data.get('room_slug')
 
-        # Simple validation: Check if the user is inviting themselves
-        if invitee_id == inviter_id:
-            raise serializers.ValidationError("You cannot invite yourself.")
+#         # Simple validation: Check if the user is inviting themselves
+#         if invitee_id == inviter_id:
+#             raise serializers.ValidationError("You cannot invite yourself.")
 
-        # Check if the room exists
-        if not Room.objects.filter(slug=room_slug).exists():
-            raise serializers.ValidationError("Room does not exist.")
+#         # Check if the room exists
+#         if not Room.objects.filter(slug=room_slug).exists():
+#             raise serializers.ValidationError("Room does not exist.")
 
-        return data
+#         return data
 
-    def create(self, validated_data):
-        invitee_id = validated_data.pop('invitee_id')
-        room_slug = validated_data.pop('room_slug')
-        inviter_id = self.context['request'].user.id
-        room = Room.objects.get(slug=room_slug)
-        room_invite = RoomInvite.objects.create(
-            inviter_id=inviter_id,
-            invitee_id=invitee_id,
-            room=room,
-            **validated_data
-        )
-        return room_invite
+#     def create(self, validated_data):
+#         invitee_id = validated_data.pop('invitee_id')
+#         room_slug = validated_data.pop('room_slug')
+#         inviter_id = self.context['request'].user.id
+#         room = Room.objects.get(slug=room_slug)
+#         room_invite = RoomInvite.objects.create(
+#             inviter_id=inviter_id,
+#             invitee_id=invitee_id,
+#             room=room,
+#             **validated_data
+#         )
+#         return room_invite
         

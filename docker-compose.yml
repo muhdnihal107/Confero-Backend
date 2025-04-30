@@ -116,6 +116,30 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
 
+  room_service_celery_beat:
+    build:
+      context: ./room_service
+    container_name: room_service_celery_beat
+    restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+      confero_db:
+        condition: service_healthy
+    volumes:
+      - ./room_service:/app
+      - ./media:/app/media
+    networks:
+      - confero_network
+    command: celery -A room_service beat --loglevel=info
+    environment:
+      - DJANGO_SETTINGS_MODULE=room_service.settings
+      - DATABASE_URL=postgresql://confero_user:confero_pass@confero_db:5432/confero_db
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+
       
   confero_db:
     image: postgres:15

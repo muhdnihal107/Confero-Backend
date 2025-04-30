@@ -68,21 +68,25 @@ class Room(models.Model):
         ]
 
 class VideoCallSchedule(models.Model):
-    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="schedules")
-    creator = models.ForeignKey('auth.User', on_delete=models.CASCADE, related_name="created_schedules")
-    participants = models.JSONField(default=list)  # List of user IDs
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="schedules",null=True,blank=True)
+    creator_id = models.IntegerField()  # Store user ID without ForeignKey
+    creator_email = models.EmailField()  # Store creator's email
+    participants = models.JSONField(default=list)  # List of {"id": int, "email": str}
     scheduled_time = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
-    is_notified = models.BooleanField(default=False)  # Track if start notification sent
+    is_notified = models.BooleanField(default=False)
 
     def clean(self):
         if self.scheduled_time <= timezone.now():
             raise ValidationError("Scheduled time must be in the future.")
         if not self.participants:
             raise ValidationError("At least one participant is required.")
+        for p in self.participants:
+            if not isinstance(p, dict) or 'id' not in p or 'email' not in p:
+                raise ValidationError("Each participant must have an 'id' and 'email'.")
 
     def save(self, *args, **kwargs):
-        self.full_clean()  # Run validation before saving
+        self.full_clean()
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -94,10 +98,9 @@ class VideoCallSchedule(models.Model):
             models.Index(fields=['is_notified']),
         ]
 
-
-class RoomInvite(models.Model):
-    room = models.ForeignKey(Room,on_delete=models.CASCADE)
-    inviter_id = models.IntegerField()
-    invitee_id = models.IntegerField()
-    created_at = models.DateTimeField(auto_now_add=True)
+# class RoomInvite(models.Model):
+#     room = models.ForeignKey(Room,on_delete=models.CASCADE)
+#     inviter_id = models.IntegerField()
+#     invitee_id = models.IntegerField()
+#     created_at = models.DateTimeField(auto_now_add=True)
     

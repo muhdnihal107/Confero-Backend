@@ -6,6 +6,7 @@ import logging
 import pika
 import os
 import json
+from django.utils import timezone
 
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,7 @@ def send_room_invite_email(room_id, receiver_id, sender_email, friend_email):
         # Log any other errors during email sending
         logger.error(f"Error sending email to {friend_email}: {str(e)}")
 
+# Send "room started" notification
 @shared_task
 def send_room_start_notification(schedule_id):
     try:
@@ -72,12 +74,12 @@ def send_room_start_notification(schedule_id):
         channel = connection.channel()
         channel.queue_declare(queue="notification_queue", durable=True)
 
-        for participant_id in schedule.participants:
+        for participant in schedule.participants:
             notification_data = {
-                "receiver_id": str(participant_id),
+                "receiver_id": str(participant['id']),
                 "message": f"Room '{schedule.room.name}' has started! Join now.",
                 "type": "room_start",
-                "friend_request_id": str(schedule.room.id),  # Room ID
+                "friend_request_id": str(schedule.room.id),
             }
             channel.basic_publish(
                 exchange="",
@@ -85,7 +87,7 @@ def send_room_start_notification(schedule_id):
                 body=json.dumps(notification_data),
                 properties=pika.BasicProperties(delivery_mode=2)
             )
-            logger.info(f"Room start notification sent to user {participant_id} for room {schedule.room.id}")
+            logger.info(f"Room start notification sent to user {participant['id']} for room {schedule.room.id}")
 
         connection.close()
         schedule.is_notified = True
@@ -95,37 +97,65 @@ def send_room_start_notification(schedule_id):
     except Exception as e:
         logger.error(f"Error sending room start notification for schedule {schedule_id}: {e}")
 
-# New task: Send invites for scheduled video call
+# Trigger InviteFriendView-like logic
 @shared_task
 def send_scheduled_invites(schedule_id):
     try:
         schedule = VideoCallSchedule.objects.get(id=schedule_id)
         room = schedule.room
-        creator = schedule.creator
 
-        for participant_id in schedule.participants:
+        credentials = pika.PlainCredentials(
+            os.getenv('RABBITMQ_USER', 'admin'),
+            os.getenv('RABBITMQ_PASS', 'adminpassword')
+        )
+        connection = pika.BlockingConnection(
+            pika.ConnectionParameters(
+                host=os.getenv('RABBITMQ_HOST', 'rabbitmq'),
+                port=int(os.getenv('RABBITMQ_PORT', 5672)),
+                credentials=credentials
+            )
+        )
+        channel = connection.channel()
+        channel.queue_declare(queue="notification_queue", durable=True)
+
+        for participant in schedule.participants:
+            receiver_id = participant['id']
+            friend_email = participant['email']
+
+            # Send notification (like InviteFriendView.send_notification)
+            notification_data = {
+                "receiver_id": str(receiver_id),
+                "message": f"{schedule.creator_email} invited you to join room '{room.name}'.",
+                "type": "room_invite",
+                "friend_request_id": str(room.id),
+            }
+            channel.basic_publish(
+                exchange="",
+                routing_key="notification_queue",
+                body=json.dumps(notification_data),
+                properties=pika.BasicProperties(delivery_mode=2)
+            )
+            logger.info(f"Notification sent for user {receiver_id} to join room {room.id}")
+
+            # Queue email (like InviteFriendView)
             try:
-                participant = User.objects.get(id=participant_id)
-                if participant_id not in room.invited_users:
-                    room.invited_users.append(participant_id)
-                    room.save()
                 send_room_invite_email.delay(
                     room_id=room.id,
-                    receiver_id=participant_id,
-                    sender_email=creator.email,
-                    friend_email=participant.email
+                    receiver_id=receiver_id,
+                    sender_email=schedule.creator_email,
+                    friend_email=friend_email
                 )
-                logger.info(f"Queued invite email for {participant.email} for room {room.id}")
-            except User.DoesNotExist:
-                logger.error(f"User {participant_id} does not exist")
+                logger.info(f"Queued invite email for {friend_email} for room {room.id}")
             except Exception as e:
-                logger.error(f"Error sending invite to {participant_id} for room {room.id}: {e}")
+                logger.error(f"Error queuing invite email for {friend_email}: {e}")
+
+        connection.close()
     except VideoCallSchedule.DoesNotExist:
         logger.error(f"Schedule {schedule_id} does not exist")
     except Exception as e:
         logger.error(f"Error processing invites for schedule {schedule_id}: {e}")
 
-# New task: Check for due video call schedules
+# Check for due video call schedules
 @shared_task
 def check_scheduled_video_calls():
     try:
