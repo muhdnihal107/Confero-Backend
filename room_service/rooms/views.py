@@ -3,7 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from .models import Room
+from .models import Room,VideoCallSchedule
 from .serializers import RoomSerializer,RoomUpdateSerializer,VideoCallScheduleSerializer
 import requests
 import logging
@@ -351,11 +351,17 @@ class DeleteAllRooms(APIView):
 #------------------------------------------------------------------------------------------------------
 logger = logging.getLogger(__name__)
 
+
 class ScheduleVideoCallView(APIView):
     permission_classes = [IsAuthenticated]
+    def get(self,request):
+        user = request.user
+        schedule = VideoCallSchedule.objects.filter(creator_id=user.id)
+        serializer = VideoCallScheduleSerializer(schedule,many=True)
+        return Response(serializer.data,status=status.HTTP_200_OK)
 
     def post(self, request):
-        participants = request.data.get('participants', [])  # Expect [{"id": int, "email": str}, ...]
+        participants = request.data.get('part', [])  # Expect [{"id": int, "email": str}, ...]
         serializer = VideoCallScheduleSerializer(data={
             'room': request.data.get('room_id'),
             'participants': participants,
@@ -404,3 +410,8 @@ class ScheduleVideoCallView(APIView):
             logger.error(f"Error sending schedule notification: {e}")
         
 
+class AllScheduleView(APIView):
+    def get(self,request):
+        data=VideoCallSchedule.objects.all()
+        serializer=VideoCallScheduleSerializer(data,many=True)
+        return Response(serializer.data,status=status.HTTP_200_OK)

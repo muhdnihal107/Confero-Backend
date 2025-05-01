@@ -31,7 +31,7 @@ class RoomUpdateSerializer(serializers.ModelSerializer):
 class VideoCallScheduleSerializer(serializers.ModelSerializer):
     class Meta:
         model = VideoCallSchedule
-        fields = ['id', 'room', 'creator_id', 'creator_email', 'participants', 'scheduled_time', 'created_at']
+        fields = ['id', 'room', 'creator_id', 'creator_email', 'participants', 'scheduled_time', 'created_at','is_notified']
         read_only_fields = ['id', 'created_at']
 
     def validate_scheduled_time(self, value):
