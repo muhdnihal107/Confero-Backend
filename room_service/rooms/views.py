@@ -415,3 +415,9 @@ class AllScheduleView(APIView):
         data=VideoCallSchedule.objects.all()
         serializer=VideoCallScheduleSerializer(data,many=True)
         return Response(serializer.data,status=status.HTTP_200_OK)
+    
+class deleteScheduleView(APIView):
+    def delete(self,request):
+        data=VideoCallSchedule.objects.all()
+        data.delete()
+        return Response({'mssg':'deleted'},status=status.HTTP_204_NO_CONTENT)

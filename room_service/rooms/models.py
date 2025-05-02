@@ -76,18 +76,6 @@ class VideoCallSchedule(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     is_notified = models.BooleanField(default=False)
 
-    def clean(self):
-        if self.scheduled_time <= timezone.now():
-            raise ValidationError("Scheduled time must be in the future.")
-        if not self.participants:
-            raise ValidationError("At least one participant is required.")
-        for p in self.participants:
-            if not isinstance(p, dict) or 'id' not in p or 'email' not in p:
-                raise ValidationError("Each participant must have an 'id' and 'email'.")
-
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Video call in {self.room.name} at {self.scheduled_time}"

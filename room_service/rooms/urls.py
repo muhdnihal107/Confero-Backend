@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import RoomView, PublicRoomsView,RoomUpdateAPIView,DeleteRoom,HealthCheckView,InviteFriendView,AcceptRoomInviteView,JoinPublicRoomView,RoomDetails,DeleteAllRooms,RoomCreateAPIView,ScheduleVideoCallView,AllScheduleView
+from .views import RoomView, PublicRoomsView,RoomUpdateAPIView,DeleteRoom,HealthCheckView,InviteFriendView,AcceptRoomInviteView,JoinPublicRoomView,RoomDetails,DeleteAllRooms,RoomCreateAPIView,ScheduleVideoCallView,AllScheduleView,deleteScheduleView
 
 urlpatterns = [
     path('rooms/', RoomView.as_view(), name='rooms'),
@@ -16,6 +16,7 @@ urlpatterns = [
     path('deleteall/',DeleteAllRooms.as_view()),
     path('schedule-videocall/',ScheduleVideoCallView.as_view(),name='schedule-videocall'),
     path('schedule-all/',AllScheduleView.as_view(),name='schedule-all'),
+    path('schedule-delete/',deleteScheduleView.as_view(),name='schedule-delete'),
 
 
 ]
